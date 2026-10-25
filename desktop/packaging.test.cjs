@@ -13,10 +13,11 @@ async function fixture(t, code = 'export const ready = true;\n') {
   const source = path.join(directory,'source');
   await fs.mkdir(path.join(source,'server'),{recursive:true});
   await fs.mkdir(path.join(source,'desktop'),{recursive:true});
-  await fs.mkdir(path.join(source,'dist'),{recursive:true});
+  await fs.mkdir(path.join(source,'dist','assets'),{recursive:true});
   await fs.writeFile(path.join(source,'server','index.js'),code);
   await fs.writeFile(path.join(source,'desktop','main.cjs'),'module.exports = {};\n');
   await fs.writeFile(path.join(source,'dist','index.html'),'<html>Mother</html>');
+  await fs.writeFile(path.join(source,'dist','assets','app.js'),'console.log("Mother");\r\n');
   await fs.writeFile(path.join(source,'package.json'),JSON.stringify({version:require('../package.json').version}));
   const archive=path.join(directory,'app.asar');
   await asar.createPackage(source,archive);
@@ -47,4 +48,23 @@ test('packaging rejects an interface changed while the archive was built', async
   const {source,archive}=await fixture(t);
   await fs.writeFile(path.join(source,'dist','index.html'),'<html>New build</html>');
   assert.throws(()=>validateArchive(archive,source),/interface changed during build/);
+});
+
+
+test('nested interface assets validate with Windows ASAR lookup semantics', async t=>{
+  const {source,archive}=await fixture(t,'export const ready = true;\r\n');
+  if(process.platform==='win32'){
+    assert.doesNotThrow(()=>validateArchive(archive,source));
+    return;
+  }
+  // Reproduce ASAR's Win32 dirname/basename/separator lookup on Linux CI too.
+  // Keep absolute fixture paths native so this tests member lookup rather than
+  // asking the Linux filesystem to open Windows paths. The ASAR header is cached
+  // before the synchronous substitution, and all methods are restored afterward.
+  asar.listPackage(archive);
+  const original={dirname:path.dirname,basename:path.basename,normalize:path.normalize,sep:path.sep};
+  const win={dirname:path.win32.dirname,basename:path.win32.basename,normalize:path.win32.normalize,sep:path.win32.sep};
+  Object.assign(path,{...win,normalize:value=>value.startsWith('/')?original.normalize(value):win.normalize(value)});
+  try{assert.doesNotThrow(()=>validateArchive(archive,source));}
+  finally{Object.assign(path,original);}
 });

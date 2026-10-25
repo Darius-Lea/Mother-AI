@@ -13,7 +13,9 @@ function validateArchive(archive, projectRoot) {
   let checked = 0;
   for (const name of entries.filter(entry => /^\/server\/.*\.js$/.test(entry) || /^\/desktop\/(main|preload|security)\.cjs$/.test(entry))) {
     const relative = name.slice(1);
-    const packaged = asar.extractFile(archive, relative);
+    // ASAR's lookup uses the host path separator internally. Keep listing
+    // comparisons portable, but convert member names back to native paths.
+    const packaged = asar.extractFile(archive, path.normalize(relative));
     const source = fs.readFileSync(path.join(projectRoot, relative));
     if (!packaged.equals(source)) throw new Error(`Packaged source changed during build: ${relative}. Rebuild from an unchanged source tree.`);
     const syntax = spawnSync(process.execPath, ['--check', `--input-type=${name.endsWith('.cjs') ? 'commonjs' : 'module'}`], { input: packaged, encoding: 'utf8' });
@@ -23,7 +25,7 @@ function validateArchive(archive, projectRoot) {
   for (const name of entries.filter(entry => entry.startsWith('/dist/'))) {
     const source = path.join(projectRoot, name.slice(1));
     if (!fs.statSync(source).isFile()) continue;
-    if (!asar.extractFile(archive, name.slice(1)).equals(fs.readFileSync(source))) throw new Error(`Packaged interface changed during build: ${name}. Rebuild from an unchanged source tree.`);
+    if (!asar.extractFile(archive, path.normalize(name.slice(1))).equals(fs.readFileSync(source))) throw new Error(`Packaged interface changed during build: ${name}. Rebuild from an unchanged source tree.`);
   }
   const metadata = JSON.parse(asar.extractFile(archive, 'package.json').toString('utf8'));
   if (metadata.version !== require('../package.json').version) throw new Error('Packaged version does not match the completed build.');
