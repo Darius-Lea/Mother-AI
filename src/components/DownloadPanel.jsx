@@ -15,6 +15,13 @@ function formatSize(bytes) {
   return bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 3).toFixed(1)} GB` : `${Math.ceil(bytes / 1024 ** 2)} MB`;
 }
 
+function trustedBuildUrl(value) {
+  try {
+    const url=new URL(value);
+    return url.protocol==='https:' && !url.username && !url.password && url.hostname==='github.com' && url.pathname.startsWith('/Darius-Lea/Mother-AI/actions/') ? url.href : null;
+  } catch { return null; }
+}
+
 const platformNames = { windows: 'Windows', mac: 'Mac', linux: 'Linux', mobile: 'Phone or tablet' };
 const formatNames = { exe: 'Setup wizard', dmg: 'Mac disk image', deb: 'Package installer', appimage: 'Portable desktop app' };
 
@@ -40,6 +47,7 @@ export default function DownloadPanel({ canInstall = false, onInstall, isDesktop
   useEffect(() => { refresh(); }, []);
 
   const artifacts = (manifest?.artifacts || []).filter((artifact) => artifact.platform === platform && artifact.filename && artifact.downloadUrl?.startsWith('/downloads/') && /^[a-f0-9]{64}$/i.test(artifact.sha256 || '') && artifact.size > 0);
+  const buildDownloads=trustedBuildUrl(manifest?.latestCompletedBuildUrl) || trustedBuildUrl(manifest?.desktopBuildsUrl);
   const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent || '') || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
   return <div className="panel-content download-panel">
@@ -66,15 +74,20 @@ export default function DownloadPanel({ canInstall = false, onInstall, isDesktop
       </div>}
       {installError && <p className="error-message" role="alert">{installError}</p>}
       <div className="info-callout"><strong>A connected companion.</strong><p>Installation needs a reachable HTTPS Mother site or localhost and browser support. After its first visit, the cached interface and offline guide can work without a connection. Neural conversations and app connections still need a reachable Mother server with a model. This is not a bundled native iOS or Android neural runtime.</p></div>
-      <p className="field-hint">There is no public hosted mobile address or App Store / Play Store release included in this development build. Hosting and secure pairing are separate deployment work.</p>
+      <p className="field-hint">This web address can be added to your home screen when served over HTTPS. Native App Store / Play Store releases and secure desktop pairing are separate work.</p>
     </section> : <section className="connection-section">
       <div className="section-heading"><h3><Monitor size={16} style={{verticalAlign:'middle',marginRight:7}}/>{platformNames[platform]} downloads</h3><button className="button ghost small" type="button" onClick={refresh} disabled={busy}><RefreshCw size={12}/>{busy?'Checking…':'Refresh'}</button></div>
       {error && <p className="error-message" role="alert">{error}</p>}
       {!error && !manifest && <p role="status" className="muted">Checking available installers…</p>}
       {manifest && !artifacts.length && <div className="source-review">
-        <span className="badge">{isDesktop?'Installed app':'Build pending'}</span>
-        <h3 style={{marginTop:12}}>{isDesktop?'This app does not bundle copies of its own installer.':`No ${platformNames[platform]} installer is available here yet.`}</h3>
-        <p>Mother only offers downloads after the actual package exists. A source archive is not an ordinary app installer.</p>
+        <span className="badge">{isDesktop?'Installed app':buildDownloads?'Desktop test builds':'Build pending'}</span>
+        <h3 style={{marginTop:12}}>{isDesktop?'Mother is already installed on this computer.':buildDownloads?'Get your desktop preview.':`No ${platformNames[platform]} installer is available here yet.`}</h3>
+        {buildDownloads ? <>
+          <p>Desktop downloads are kept with our GitHub test builds. This hosted preview does not contain installer files.</p>
+          <div className="button-row"><a className="button primary" href={buildDownloads} target="_blank" rel="noreferrer"><Download size={14}/>Desktop test downloads</a></div>
+          <ol className="download-build-steps"><li>Sign in to GitHub and open a successful build.</li><li>Under Artifacts, choose the {platformNames[platform]} installer download.</li><li>Unzip the download and open the setup file for your computer.</li></ol>
+          <p className="field-hint">Choose x64 for most Intel or AMD computers, or arm64 for Apple Silicon and other ARM devices. These are unsigned previews; your operating system may ask for approval.</p>
+        </> : <p>Mother only offers downloads after the actual package exists. A source archive is not an ordinary app installer.</p>}
       </div>}
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(min(100%,220px),1fr))',gap:12}}>
         {artifacts.map((artifact) => <article className="source-review" key={artifact.filename} style={{marginTop:14}}>

@@ -3,7 +3,7 @@
   "version": "1.0.0-preview.1",
   "private": true,
   "engines": {
-    "node": ">=24.5.0"
+    "node": ">=24.5.0 <25"
   },
   "type": "module",
   "scripts": {
@@ -16,7 +16,9 @@
     "desktop": "npm run build && electron .",
     "desktop:pack": "npm run build && electron-builder --dir",
     "desktop:dist": "npm run build && electron-builder",
-    "desktop:linux": "npm run build && electron-builder --linux AppImage deb"
+    "desktop:linux": "npm run build && electron-builder --linux AppImage deb",
+    "postinstall": "node scripts/render-postinstall.cjs",
+    "start:web": "node server/index.js"
   },
   "dependencies": {
     "express": "^5.1.0",

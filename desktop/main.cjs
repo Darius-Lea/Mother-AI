@@ -1,4 +1,11 @@
 'use strict';
+// Render may retain an auto-detected `node desktop/main.cjs` command.
+// Plain Node starts the web service; Electron alone initializes native APIs.
+if (!process.versions.electron) {
+  import('../server/index.js').then(({startServer})=>startServer()).catch(error=>{
+    console.error('Mother web startup failed:',error.message);process.exitCode=1;
+  });
+} else {
 const { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, session, shell } = require('electron');
 const { randomBytes } = require('node:crypto');
 const fs = require('node:fs');
@@ -207,4 +214,6 @@ if (!singleInstance) {
     localServer?.close();
     localServer?.closeAllConnections?.();
   });
+}
+
 }

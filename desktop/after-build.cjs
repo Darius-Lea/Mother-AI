@@ -9,9 +9,9 @@ const { spawnSync } = require('node:child_process');
 const asar = require('@electron/asar');
 
 function validateArchive(archive, projectRoot) {
-  const entries = asar.listPackage(archive);
+  const entries = asar.listPackage(archive).map(name => name.replaceAll('\\', '/'));
   let checked = 0;
-  for (const name of entries.filter(entry => /^\/(server|desktop)\/.*\.(?:js|cjs)$/.test(entry))) {
+  for (const name of entries.filter(entry => /^\/server\/.*\.js$/.test(entry) || /^\/desktop\/(main|preload|security)\.cjs$/.test(entry))) {
     const relative = name.slice(1);
     const packaged = asar.extractFile(archive, relative);
     const source = fs.readFileSync(path.join(projectRoot, relative));
@@ -19,6 +19,11 @@ function validateArchive(archive, projectRoot) {
     const syntax = spawnSync(process.execPath, ['--check', `--input-type=${name.endsWith('.cjs') ? 'commonjs' : 'module'}`], { input: packaged, encoding: 'utf8' });
     if (syntax.status !== 0) throw new Error(`Packaged source does not parse: ${relative}\n${syntax.stderr}`);
     checked++;
+  }
+  for (const name of entries.filter(entry => entry.startsWith('/dist/'))) {
+    const source = path.join(projectRoot, name.slice(1));
+    if (!fs.statSync(source).isFile()) continue;
+    if (!asar.extractFile(archive, name.slice(1)).equals(fs.readFileSync(source))) throw new Error(`Packaged interface changed during build: ${name}. Rebuild from an unchanged source tree.`);
   }
   const metadata = JSON.parse(asar.extractFile(archive, 'package.json').toString('utf8'));
   if (metadata.version !== require('../package.json').version) throw new Error('Packaged version does not match the completed build.');

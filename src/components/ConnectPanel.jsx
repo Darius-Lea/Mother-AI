@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { downloadMemory, importMemory, MAX_MEMORY_BYTES } from '../lib/memory.js';
 
-export default function ConnectPanel({ memory, onMemoryChange, installAvailable=false, onInstall, onOpenSetup }) {
+export default function ConnectPanel({ memory, onMemoryChange, installAvailable=false, onInstall, onOpenSetup, hostedPreview=false }) {
   const [models, setModels] = useState([]);
   const [available, setAvailable] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -27,7 +27,7 @@ export default function ConnectPanel({ memory, onMemoryChange, installAvailable=
     } finally { setBusy(false); }
   }
 
-  useEffect(() => { refreshModels(); }, []);
+  useEffect(() => { if(!hostedPreview)refreshModels(); }, [hostedPreview]);
 
   async function inspectImport(file) {
     setError('');
@@ -49,7 +49,7 @@ export default function ConnectPanel({ memory, onMemoryChange, installAvailable=
 
   return (
     <div className="panel-content connect-panel">
-      <div className="panel-intro"><span className="eyebrow">YOURS, WHEREVER YOU GO</span><h2>A companion. Your control.</h2><p>Run a free local model, keep your memories, and carry them to another Mother installation.</p></div>
+      <div className="panel-intro"><span className="eyebrow">YOURS, WHEREVER YOU GO</span><h2>A companion. Your control.</h2><p>{hostedPreview?'Keep your preferences and memory in this browser, then carry them to another Mother installation.':'Run a free local model, keep your memories, and carry them to another Mother installation.'}</p></div>
       <section className="connection-section">
         <h3>Make this space yours</h3>
         <label className="field-label" htmlFor="profile-name">What should Mother call you?</label>
@@ -57,7 +57,7 @@ export default function ConnectPanel({ memory, onMemoryChange, installAvailable=
         <label className="checkbox-field"><input type="checkbox" checked={memory.settings.reducedMotion === true} onChange={(event) => onMemoryChange({ ...memory, settings: { ...memory.settings, reducedMotion: event.target.checked } })} />Reduce particle motion</label>
         <p className="field-hint">Your preferences are kept in this browser and included in memory exports.</p>
       </section>
-      <section className="connection-section">
+      {!hostedPreview && <section className="connection-section">
         <div className="section-heading"><h3>Local intelligence</h3><span className={`badge ${available ? 'connected' : ''}`}>{available ? 'Connected' : 'Not connected'}</span></div>
         <div className="button-row"><button type="button" className="button primary" onClick={onOpenSetup}>Open guided setup</button></div>
         <p style={{marginTop:12}}>Mother uses Ollama for real neural-model conversations, with no paid API key. Model downloads require internet, disk space, and suitable hardware; local inference can work offline afterward.</p>
@@ -71,7 +71,7 @@ export default function ConnectPanel({ memory, onMemoryChange, installAvailable=
           <button type="button" className="button secondary" disabled={busy} onClick={refreshModels}>{busy ? 'Checking…' : 'Refresh'}</button>
         </div>
         <details className="setup-details"><summary>Set up a free local brain</summary><p>Install <a href="https://ollama.com" target="_blank" rel="noreferrer">Ollama</a> on the computer hosting Mother. Then, in a terminal:</p><pre>ollama serve{'\n'}ollama pull qwen2.5:0.5b</pre><p>Run these in separate terminals if needed. The example is a small starter model; larger models may answer better but need more memory. Refresh here and select the model after the download completes.</p></details>
-      </section>
+      </section>}
       <section className="connection-section">
         <div className="section-heading"><h3>Portable memory</h3><span className="badge">Local first</span></div>
         <p>Export your conversations, reviewed sources, feedback, and preferences. Copy the JSON file to a USB drive or share it with another device, then import it there.</p>

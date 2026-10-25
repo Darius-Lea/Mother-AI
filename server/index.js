@@ -11,6 +11,7 @@ import {createIntegrationRouters} from './integrations.js';
 import {createWorkspaceRouter} from './workspace.js';
 import {createKaliRouter} from './kali.js';
 import { DatasetError, inspectDataset } from './datasets.js';
+import {deploymentConfig,publicCapabilities} from './deployment.js';
 
 /** The browser may not access the local brain through an attacker-owned DNS name. */
 export function isAllowedHostHeader(header, allowedHosts = []) {
@@ -28,10 +29,12 @@ export function isAllowedHostHeader(header, allowedHosts = []) {
   });
 }
 
-export function createApp({ fetchImpl = fetch, inspect = inspectDataset, desktopToken, dataDirectory = process.env.MOTHER_DATA_DIR || path.join(os.homedir(), '.mother-ai'), workspaceRoot, allowedHosts = (process.env.MOTHER_ALLOWED_HOSTS || '').split(',').filter(Boolean) } = {}) {
+export function createApp({ fetchImpl = fetch, inspect = inspectDataset, desktopToken, dataDirectory = process.env.MOTHER_DATA_DIR || path.join(os.homedir(), '.mother-ai'), workspaceRoot, mode = deploymentConfig(process.env,desktopToken).mode, allowedHosts = deploymentConfig(process.env,desktopToken).allowedHosts } = {}) {
   const app = express();
   app.disable('x-powered-by');
+  const hostedPreview=mode==='hosted-preview';
   const brain=createLocalBrain({fetchImpl});
+  app.locals.mode=mode;
   const requireAdmin=(req,res,next)=>{
     if(!desktopToken)return next();
     const supplied=req.get('X-Mother-Desktop-Token');
@@ -42,6 +45,10 @@ export function createApp({ fetchImpl = fetch, inspect = inspectDataset, desktop
   app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
+    if(hostedPreview){
+      res.setHeader('X-Frame-Options','DENY');
+      res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'");
+    }
     if (!isAllowedHostHeader(req.get('host'), allowedHosts)) {
       return res.status(403).json({ error: 'Untrusted Host header. Use localhost, a literal IP address, or an explicitly configured MOTHER_ALLOWED_HOSTS hostname.' });
     }
@@ -56,11 +63,17 @@ export function createApp({ fetchImpl = fetch, inspect = inspectDataset, desktop
     }
     next();
   });
+  app.use('/api',(req,res,next)=>{
+    if(hostedPreview&&!['/health','/models','/distribution'].includes(req.path)){
+      return res.status(403).json({error:'This web preview keeps computer controls private. Download Mother for local AI setup, projects, app permissions, and host security tools.',mode:'hosted-preview'});
+    }
+    next();
+  });
   app.use(express.json({ limit: '1mb' }));
   app.use('/api',(req,res,next)=>{if(req.path==='/health'||req.path==='/distribution'||req.path==='/connect'||req.path.startsWith('/connect/'))return next();return requireAdmin(req,res,next);});
 
-  app.get('/api/health',(_req,res)=>res.json({ok:true,name:'Mother AI',version:'1.0.0-preview.1',releaseStatus:'first-release-preview',storage:'browser-local',paidServices:false}));
-  app.get('/api/models',async(_req,res)=>res.json(await brain.models()));
+  app.get('/api/health',(_req,res)=>res.json({ok:true,name:'Mother AI',version:'1.0.0-preview.1',releaseStatus:'first-release-preview',storage:'browser-local',paidServices:false,mode,capabilities:publicCapabilities(mode)}));
+  app.get('/api/models',async(_req,res)=>res.json(hostedPreview?{available:false,models:[],mode,error:'This hosted preview uses the offline guide. Local neural models run in the desktop app.'}:await brain.models()));
   app.post('/api/chat',async(req,res)=>{try{res.json(await brain.chat(req.body));}catch(error){res.status(error.status||500).json({error:error.message});}});
   const modelRouter=createModelRouter({fetchImpl});
   app.use('/api/setup',modelRouter);
@@ -80,7 +93,7 @@ export function createApp({ fetchImpl = fetch, inspect = inspectDataset, desktop
 
   const releaseRoot=fileURLToPath(new URL('../releases',import.meta.url));
   const manifestFile=fileURLToPath(new URL('../public/downloads.json',import.meta.url));
-  const distribution=async()=>{try{return JSON.parse(await fs.readFile(manifestFile,'utf8'));}catch{return {version:'1.0.0-preview.1',artifacts:[]};}};
+  const distribution=async()=>{const links={desktopBuildsUrl:'https://github.com/Darius-Lea/Mother-AI/actions/workflows/desktop-installers.yml'};try{return {...JSON.parse(await fs.readFile(manifestFile,'utf8')),...links};}catch{return {version:'1.0.0-preview.1',artifacts:[],...links};}};
   app.get('/api/distribution',async(_req,res)=>{res.setHeader('Cache-Control','no-store');res.json(await distribution());});
   app.get('/downloads/:filename',async(req,res)=>{
     const manifest=await distribution();const artifact=manifest.artifacts?.find(item=>item.filename===req.params.filename);
@@ -105,8 +118,18 @@ export function createApp({ fetchImpl = fetch, inspect = inspectDataset, desktop
   return app;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const port = Number(process.env.PORT || 3001);
-  const host = process.env.HOST || '127.0.0.1';
-  createApp().listen(port, host, () => console.log(`Mother AI API listening on ${host}:${port}`));
+export function startServer({env=process.env}={}) {
+  const config=deploymentConfig(env);
+  const app=createApp({mode:config.mode,allowedHosts:config.allowedHosts});
+  const server=app.listen(config.port,config.host,()=>console.log(`Mother AI web server listening on ${config.host}:${server.address().port} (${config.mode}).`));
+  let stopping=false;
+  const shutdown=()=>{
+    if(stopping)return;stopping=true;
+    app.locals.shutdown?.();server.close();server.closeAllConnections?.();
+  };
+  server.once('close',()=>{process.off('SIGTERM',shutdown);process.off('SIGINT',shutdown);});
+  process.once('SIGTERM',shutdown);process.once('SIGINT',shutdown);
+  return {app,server,shutdown};
 }
+
+if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))startServer();

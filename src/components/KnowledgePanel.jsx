@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { downloadTrainingExamples, exportTrainingExamples, inspectLocalDataset, makeId } from '../lib/memory.js';
 
-export default function KnowledgePanel({ memory, onMemoryChange }) {
+export default function KnowledgePanel({ memory, onMemoryChange, hostedPreview=false }) {
   const [url, setUrl] = useState('');
   const [candidate, setCandidate] = useState(null);
   const [approved, setApproved] = useState(false);
@@ -86,14 +86,15 @@ export default function KnowledgePanel({ memory, onMemoryChange }) {
         <strong>Reference memory, with you in control.</strong>
         <p>Documents add context to answers. They do not change neural model weights or guarantee that a claim is true. Source text is treated as data, not instructions.</p>
       </div>
-      <form onSubmit={inspectLink} className="dataset-form">
+      {!hostedPreview && <form onSubmit={inspectLink} className="dataset-form">
         <label className="field-label" htmlFor="dataset-url">Dataset link</label>
         <div className="inline-field">
           <input id="dataset-url" type="url" required value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://…/dataset.json" disabled={busy} />
           <button className="button primary" type="submit" disabled={busy || !url.trim()}>{busy ? 'Inspecting…' : 'Inspect'}</button>
         </div>
         <p className="field-hint">Public HTTPS text, JSON, JSONL, CSV, or Markdown · 2 MB maximum</p>
-      </form>
+      </form>}
+      {hostedPreview && <p className="info-callout">Upload a small reference file to explore Mother’s knowledge library. Link inspection is available in the desktop app.</p>}
       <div className="upload-row">
         <input ref={upload} type="file" accept=".txt,.json,.jsonl,.csv,.md" hidden aria-label="Upload dataset file" onChange={(event) => {
           const file = event.target.files?.[0];

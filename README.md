@@ -36,6 +36,10 @@ Real neural inference has not been verified in the current cloud machine: offici
 
 Every app and IoT device needs a supported interface, permission, and an adapter. Mother does not automatically control arbitrary technology, jump between devices, train her own weights, or provide all the aspirational features pictured in the reference sheet. The complete [feature status](docs/FEATURES.md) distinguishes working, partial, and unimplemented behavior.
 
+## Render web preview
+
+Deploy the latest `main` commit. Use build command `npm ci --include=dev && npm run build` and start command `npm start`. Existing Render services still using `npm install` and `node desktop/main.cjs` are supported by the compatibility bootstrap. The hosted preview keeps desktop-only controls private and links to test downloads. See [Render deployment](docs/RENDER.md).
+
 ## Developers
 
 Use Node.js **24.5+** and the checked-in lockfile:

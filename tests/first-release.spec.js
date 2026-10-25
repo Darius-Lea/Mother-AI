@@ -70,10 +70,10 @@ test('coding studio writes only after approval and can restore the original',asy
 test('download center presents only existing artifacts and phone install requirements',async({page})=>{
   await page.goto('/');await page.getByRole('button',{name:'Get Mother',exact:true}).click();
   await page.getByLabel('Your device',{exact:true}).selectOption('mac');
-  await expect(page.getByText('No Mac installer is available here yet.',{exact:true})).toBeVisible();
+  await expect(page.getByRole('link',{name:'Desktop test downloads',exact:true})).toHaveAttribute('href','https://github.com/Darius-Lea/Mother-AI/actions/workflows/desktop-installers.yml');
   await page.getByLabel('Your device',{exact:true}).selectOption('mobile');
   await expect(page.getByRole('heading',{name:'Install on a phone or tablet',exact:false})).toBeVisible();
-  await expect(page.getByText('There is no public hosted mobile address',{exact:false})).toBeVisible();
+  await expect(page.getByText('This web address can be added to your home screen when served over HTTPS.',{exact:false})).toBeVisible();
 });
 
 test('security bridge reports actual tool inventory and never invents a Kali installation',async({page})=>{

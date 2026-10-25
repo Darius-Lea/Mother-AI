@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: mother-ai-preview
+    runtime: node
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_VERSION
+        value: 24.19.0
+      - key: HOST
+        value: 0.0.0.0
+      - key: MOTHER_MODE
+        value: hosted-preview
+      - key: ELECTRON_SKIP_BINARY_DOWNLOAD
+        value: "1"

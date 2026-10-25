@@ -36,3 +36,15 @@ test('packaging rejects syntax errors even when source bytes match the archive',
   const {source,archive}=await fixture(t,'const broken = (');
   assert.throws(()=>validateArchive(archive,source),/does not parse/);
 });
+test('archive validation normalizes Windows list separators', async t=>{
+  const {source,archive}=await fixture(t);
+  const original=asar.listPackage;
+  asar.listPackage=(...args)=>original(...args).map(name=>name.replaceAll('/','\\'));
+  try {assert.doesNotThrow(()=>validateArchive(archive,source));}
+  finally {asar.listPackage=original;}
+});
+test('packaging rejects an interface changed while the archive was built', async t=>{
+  const {source,archive}=await fixture(t);
+  await fs.writeFile(path.join(source,'dist','index.html'),'<html>New build</html>');
+  assert.throws(()=>validateArchive(archive,source),/interface changed during build/);
+});
