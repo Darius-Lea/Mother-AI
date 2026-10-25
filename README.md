@@ -42,7 +42,7 @@ Deploy the latest `main` commit. Use build command `npm ci --include=dev && npm 
 
 ## Developers
 
-Use Node.js **24.5+** and the checked-in lockfile:
+Use Node.js **24.19.0** and the checked-in lockfile:
 
 ```sh
 npm ci
