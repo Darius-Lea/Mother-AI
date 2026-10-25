@@ -72,16 +72,16 @@ export default function DownloadPanel({ canInstall = false, onInstall, isDesktop
       {error && <p className="error-message" role="alert">{error}</p>}
       {!error && !manifest && <p role="status" className="muted">Checking available installers…</p>}
       {manifest && !artifacts.length && <div className="source-review">
-        <span className="badge">Build pending</span>
-        <h3 style={{marginTop:12}}>No {platformNames[platform]} installer is available here yet.</h3>
+        <span className="badge">{isDesktop?'Installed app':'Build pending'}</span>
+        <h3 style={{marginTop:12}}>{isDesktop?'This app does not bundle copies of its own installer.':`No ${platformNames[platform]} installer is available here yet.`}</h3>
         <p>Mother only offers downloads after the actual package exists. A source archive is not an ordinary app installer.</p>
       </div>}
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(min(100%,220px),1fr))',gap:12}}>
         {artifacts.map((artifact) => <article className="source-review" key={artifact.filename} style={{marginTop:14}}>
-          <div className="section-heading"><h3><Package size={16} style={{verticalAlign:'middle',marginRight:7}}/>{formatNames[artifact.format] || artifact.format}</h3><span className="badge">{artifact.architecture}</span></div>
+          <div className="section-heading"><h3><Package size={16} style={{verticalAlign:'middle',marginRight:7}}/>{artifact.kind==='portable'?'Portable test app':formatNames[artifact.format] || artifact.format}</h3><span className="badge">{artifact.architecture}</span></div>
           <p>Mother {artifact.version || manifest.version} · {formatSize(artifact.size)}</p>
           <div className="button-row"><a className="button primary" href={artifact.downloadUrl} download style={{textDecoration:'none'}}><Download size={14}/>Download for {platformNames[platform]}</a></div>
-          <p className="field-hint">{artifact.format === 'exe' ? 'Open the downloaded setup file and follow the wizard.' : artifact.format === 'dmg' ? 'Open the disk image and move Mother into Applications.' : artifact.format === 'deb' ? 'Open with your distribution’s package installer.' : 'A portable Linux application. Desktop launch support varies by distribution.'}</p>
+          <p className="field-hint">{artifact.kind==='portable' ? 'Open the downloaded executable to test Mother. This portable build does not install Start-menu shortcuts.' : artifact.format === 'exe' ? 'Open the downloaded setup file and follow the wizard.' : artifact.format === 'dmg' ? 'Open the disk image and move Mother into Applications.' : artifact.format === 'deb' ? 'Open with your distribution’s package installer.' : 'A portable Linux application. Desktop launch support varies by distribution.'}</p>
           <details className="setup-details"><summary>Package integrity and signing</summary><p><ShieldCheck size={12} style={{verticalAlign:'middle',marginRight:5}}/>{artifact.signing === 'signed' ? 'Signed package.' : 'Unsigned development package. Your operating system may display a warning. A signed production release is separate work.'}</p><p>SHA-256</p><code style={{fontSize:9,overflowWrap:'anywhere',lineHeight:1.7,display:'block'}}>{artifact.sha256}</code></details>
         </article>)}
       </div>

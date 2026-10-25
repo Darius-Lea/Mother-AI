@@ -16,7 +16,7 @@ const packageInfo = JSON.parse(await readFile(path.join(root, 'package.json'), '
 const releaseRoot = path.join(root, 'releases');
 const artifacts = [];
 const names = new Set();
-const allowedName = /^Mother-AI-([0-9][0-9A-Za-z.+_-]*)-(win|windows|mac|darwin|linux)-(x64|x86_64|amd64|arm64|aarch64|ia32)\.(exe|AppImage|deb|dmg)$/;
+const allowedName = /^Mother-AI-([0-9][0-9A-Za-z.+_-]*)-(win|windows|mac|darwin|linux)-(x64|x86_64|amd64|arm64|aarch64|ia32)(?:-portable)?\.(exe|AppImage|deb|dmg)$/;
 
 async function checksum(file) {
   const hash = createHash('sha256');
@@ -90,6 +90,7 @@ async function scan(directory) {
       sha256: digest,
       downloadUrl: `/downloads/${encodeURIComponent(entry.name)}`,
       signing: 'unsigned',
+      kind: receipt.kind || (entry.name.includes('-portable.') ? 'portable' : 'installer'),
       relativePath: path.relative(releaseRoot, resolved).split(path.sep).join('/'),
     });
   }

@@ -14,7 +14,7 @@ async function verifyArtifacts(artifacts, version) {
     if (!stat.isFile() || stat.size < 1024 * 1024) throw new Error(`Installer is unexpectedly small or not a regular file: ${name}`);
     const hash = createHash('sha256');
     for await (const chunk of fs.createReadStream(filename)) hash.update(chunk);
-    const receipt = { status: 'build-completed', version, filename: name, sha256: hash.digest('hex'), platform, bytes: stat.size, signed: false, nativeInstallTested: false };
+    const receipt = { status: 'build-completed', version, filename: name, sha256: hash.digest('hex'), platform, kind: name.endsWith('-portable.exe') ? 'portable' : 'installer', bytes: stat.size, signed: false, nativeInstallTested: false };
     const target = `${filename}.build.json`;
     await fs.promises.writeFile(`${target}.tmp`, `${JSON.stringify(receipt, null, 2)}\n`, { mode: 0o600 });
     await fs.promises.rename(`${target}.tmp`, target);

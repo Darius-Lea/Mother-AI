@@ -21,7 +21,7 @@ test('first release labeling and guided setup never confuse missing runtime with
   await expect(dialog).not.toBeVisible();
 });
 
-test('guided setup verifies an already installed model and supports keyboard dismissal',async({page})=>{
+test('guided setup verifies an installed model before saving the selection',async({page})=>{
   await page.route('**/api/setup/status',route=>route.fulfill({json:{...setupStatus,runtime:{available:true,version:'test-runtime'},models:[{name:'qwen3:8b'}]}}));
   await page.goto('/');await page.getByRole('button',{name:'Connections',exact:true}).click();await page.getByRole('button',{name:'Open guided setup',exact:true}).click();
   const dialog=page.getByRole('dialog');await dialog.getByRole('button',{name:'Get started',exact:false}).click();
@@ -29,7 +29,7 @@ test('guided setup verifies an already installed model and supports keyboard dis
   await dialog.getByRole('button',{name:'Use installed model',exact:false}).click();
   await expect(dialog.getByRole('heading',{name:'Mother’s local brain is ready.'})).toBeVisible();
   await dialog.getByRole('button',{name:'Meet Mother',exact:true}).click();
-  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('mother-ai-memory-v1')).settings.model)).toBe('qwen3:8b');
+  await expect.poll(()=>page.evaluate(()=>JSON.parse(localStorage.getItem('mother-ai-memory-v1')).settings.model)).toBe('qwen3:8b');
   // Setup and runtime discovery are distinct; the simulated unavailable branch stays explicit.
   await expect(page.locator('.mode-chip')).toContainText('OFFLINE GUIDE');
 });
