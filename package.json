@@ -1,0 +1,39 @@
+{
+  "name": "mother-ai",
+  "version": "1.0.0-preview.1",
+  "private": true,
+  "engines": {
+    "node": ">=24.5.0"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n api,web \"node --watch server/index.js\" \"vite --host 0.0.0.0\"",
+    "build": "vite build",
+    "start": "node server/index.js",
+    "test": "node --test server/*.test.js src/lib/*.test.js desktop/*.test.cjs",
+    "test:e2e": "playwright test",
+    "package:portable": "npm run build && python3 scripts/package-portable.py",
+    "desktop": "npm run build && electron .",
+    "desktop:pack": "npm run build && electron-builder --dir",
+    "desktop:dist": "npm run build && electron-builder",
+    "desktop:linux": "npm run build && electron-builder --linux AppImage deb"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "lucide-react": "^0.468.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0",
+    "@vitejs/plugin-react": "^4.7.0",
+    "concurrently": "^9.2.0",
+    "vite": "^6.1.0",
+    "electron": "^45.0.0",
+    "electron-builder": "^26.0.12"
+  },
+  "description": "Mother AI \u2014 a local-first personal assistant with a living 3D presence",
+  "author": "Mother AI",
+  "main": "desktop/main.cjs"
+}

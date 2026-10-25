@@ -1,0 +1,59 @@
+appId: ai.mother.desktop
+productName: Mother AI
+executableName: mother
+asar: true
+compression: maximum
+npmRebuild: false
+afterAllArtifactBuild: desktop/after-build.cjs
+artifactName: Mother-AI-${version}-${os}-${arch}.${ext}
+directories:
+  output: releases/desktop
+files:
+  - desktop/**
+  - server/**
+  - '!server/**/*.test.js'
+  - '!desktop/**/*.test.cjs'
+  - '!server/README.md'
+  - dist/**
+  - public/icons/**
+  - package.json
+  - '!**/*.map'
+  - '!**/.env*'
+  - '!**/test-results/**'
+  - '!src/**'
+extraMetadata:
+  main: desktop/main.cjs
+win:
+  target:
+    - target: nsis
+      arch: [x64, arm64]
+  icon: desktop/icons/mother.ico
+  signAndEditExecutable: false
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: false
+  allowToChangeInstallationDirectory: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  runAfterFinish: true
+  deleteAppDataOnUninstall: false
+  uninstallDisplayName: Mother AI
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+  category: public.app-category.productivity
+  icon: public/icons/mother-512.png
+  identity: null
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+    - target: deb
+      arch: [x64]
+  icon: desktop/icons
+  maintainer: Mother AI maintainers
+  category: Utility
+  synopsis: A personal local-first AI workspace
+  description: Mother AI is a desktop workspace with a 3D particle presence, local model conversations, reviewed knowledge, portable memory, and explicit app connections.

@@ -1,0 +1,42 @@
+name: Build Mother desktop installers
+
+# This workflow builds reviewable artifacts. It never publishes a release,
+# uploads signing credentials, or executes arbitrary user-supplied scripts.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  desktop:
+    name: ${{ matrix.os }} installer
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run desktop:dist -- --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Mother-AI-${{ runner.os }}-installers
+          path: |
+            releases/desktop/*.exe
+            releases/desktop/*.dmg
+            releases/desktop/*.AppImage
+            releases/desktop/*.deb
+            releases/desktop/*.build.json
+          if-no-files-found: error
+          retention-days: 14
