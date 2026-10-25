@@ -1,4 +1,6 @@
 import {test,expect} from '@playwright/test';
+// Exercise the missing-model branch deterministically, even on a host with Ollama.
+test.beforeEach(async({page})=>{await page.route('**/api/models',route=>route.fulfill({json:{available:false,models:[],error:'Unavailable runtime test branch'}}));});
 import {mkdtemp,writeFile,readFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
@@ -28,7 +30,7 @@ test('guided setup verifies an already installed model and supports keyboard dis
   await expect(dialog.getByRole('heading',{name:'Mother’s local brain is ready.'})).toBeVisible();
   await dialog.getByRole('button',{name:'Meet Mother',exact:true}).click();
   expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('mother-ai-memory-v1')).settings.model)).toBe('qwen3:8b');
-  // The actual runtime remains absent; a mocked setup UI does not make live inference available.
+  // Setup and runtime discovery are distinct; the simulated unavailable branch stays explicit.
   await expect(page.locator('.mode-chip')).toContainText('OFFLINE GUIDE');
 });
 
@@ -72,4 +74,13 @@ test('download center presents only existing artifacts and phone install require
   await page.getByLabel('Your device',{exact:true}).selectOption('mobile');
   await expect(page.getByRole('heading',{name:'Install on a phone or tablet',exact:false})).toBeVisible();
   await expect(page.getByText('There is no public hosted mobile address',{exact:false})).toBeVisible();
+});
+
+test('security bridge reports actual tool inventory and never invents a Kali installation',async({page})=>{
+  await page.goto('/');await page.getByRole('button',{name:'Security lab',exact:true}).click();
+  await page.getByRole('tab',{name:'Security tool bridge',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'A bridge to your security tools.',exact:true})).toBeVisible();
+  await expect(page.getByText('A limited bridge, not the full Kali suite.',{exact:false})).toBeVisible();
+  await expect(page.locator('.kali-panel .knowledge-entry')).toHaveCount(3);
+  await expect(page.getByRole('button',{name:'Review check plan',exact:true})).toBeDisabled();
 });

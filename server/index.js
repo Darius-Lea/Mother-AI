@@ -9,6 +9,7 @@ import {createLocalBrain} from './brain.js';
 import {createModelRouter} from './models.js';
 import {createIntegrationRouters} from './integrations.js';
 import {createWorkspaceRouter} from './workspace.js';
+import {createKaliRouter} from './kali.js';
 import { DatasetError, inspectDataset } from './datasets.js';
 
 /** The browser may not access the local brain through an attacker-owned DNS name. */
@@ -67,7 +68,9 @@ export function createApp({ fetchImpl = fetch, inspect = inspectDataset, desktop
   app.use('/api/integrations',integrations.adminRouter);
   app.use('/api/connect',integrations.apiRouter);
   app.use('/api/workspace',createWorkspaceRouter({rootDirectory:workspaceRoot}));
-  app.locals.shutdown=()=>modelRouter.shutdown?.();
+  const securityRouter=createKaliRouter();
+  app.use('/api/security',securityRouter);
+  app.locals.shutdown=()=>{modelRouter.shutdown?.();securityRouter.shutdown?.();};
 
   app.post('/api/datasets/inspect', async (req, res) => {
     if (typeof req.body?.url !== 'string' || req.body.url.length > 4096) return res.status(400).json({ error: 'Provide one public HTTPS dataset URL.' });

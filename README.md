@@ -32,7 +32,7 @@ Real neural inference has not been verified in the current cloud machine: offici
 - Export/import portable memory to another Mother installation or a USB drive.
 - Grant compatible apps scoped, revocable access to local chat or code pattern checks. See [app integrations](docs/INTEGRATIONS.md).
 - Select a local coding project, discuss files with a model, review changes, explicitly apply them, and restore originals when safe. See [coding studio](docs/CODING.md).
-- Hash local files and check code for common risky patterns. These checks are not a full cybersecurity audit or penetration-testing suite.
+- Hash local files, review code patterns, and use a limited [security tool bridge](docs/KALI.md) for explicitly approved single-host Nmap checks when the tool is installed. The full Kali suite is not bundled.
 
 Every app and IoT device needs a supported interface, permission, and an adapter. Mother does not automatically control arbitrary technology, jump between devices, train her own weights, or provide all the aspirational features pictured in the reference sheet. The complete [feature status](docs/FEATURES.md) distinguishes working, partial, and unimplemented behavior.
 

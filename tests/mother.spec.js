@@ -1,4 +1,6 @@
 import {test,expect} from '@playwright/test';
+// Exercise the missing-model branch deterministically, even on a host with Ollama.
+test.beforeEach(async({page})=>{await page.route('**/api/models',route=>route.fulfill({json:{available:false,models:[],error:'Unavailable runtime test branch'}}));});
 import {createHash} from 'node:crypto';
 
 test('Mother renders, assembles, gestures, rests, and awakens in actual WebGL',async({page})=>{
