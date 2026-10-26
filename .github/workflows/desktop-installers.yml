@@ -17,11 +17,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: windows-latest, platform: win32, arch: x64 }
-          - { os: windows-latest, platform: win32, arch: arm64 }
-          - { os: macos-latest, platform: darwin, arch: x64 }
-          - { os: macos-latest, platform: darwin, arch: arm64 }
-          - { os: ubuntu-latest, platform: linux, arch: x64 }
+          - { os: windows-latest, platform: win32, arch: x64, platformFlag: '--win', target: 'nsis:x64' }
+          - { os: windows-latest, platform: win32, arch: arm64, platformFlag: '--win', target: 'nsis:arm64' }
+          - { os: macos-latest, platform: darwin, arch: x64, platformFlag: '--mac', target: 'pkg:x64' }
+          - { os: macos-latest, platform: darwin, arch: arm64, platformFlag: '--mac', target: 'pkg:arm64' }
+          - { os: ubuntu-latest, platform: linux, arch: x64, platformFlag: '--linux', target: 'deb:x64' }
     runs-on: ${{ matrix.os }}
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
@@ -54,7 +54,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          npm run desktop:dist -- --${{ matrix.arch }} --publish never 2>&1 | tee desktop-build.log
+          npm run desktop:dist -- ${{ matrix.platformFlag }} ${{ matrix.target }} --publish never 2>&1 | tee desktop-build.log
       - name: Record installer failure details
         if: failure()
         shell: bash
