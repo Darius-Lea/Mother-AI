@@ -27,5 +27,7 @@ export function publicCapabilities(mode) {
     datasetLinks: !hosted,
     securityBridge: !hosted,
     neuralChat: !hosted,
+    webResearch: !hosted,
+    localVoice: true,
   };
 }

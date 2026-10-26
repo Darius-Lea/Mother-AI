@@ -15,6 +15,6 @@ test('desktop session and local development retain their local behavior',()=>{
   assert.throws(()=>deploymentConfig({PORT:'invalid'}),/PORT/);
 });
 test('hosted preview advertises only browser-local functionality',()=>{
-  assert.deepEqual(publicCapabilities('hosted-preview'),{localTools:true,modelSetup:false,projectAccess:false,appGrants:false,datasetLinks:false,securityBridge:false,neuralChat:false});
+  assert.deepEqual(publicCapabilities('hosted-preview'),{localTools:true,modelSetup:false,projectAccess:false,appGrants:false,datasetLinks:false,securityBridge:false,neuralChat:false,webResearch:false,localVoice:true});
   assert.equal(publicCapabilities('desktop').projectAccess,true);
 });

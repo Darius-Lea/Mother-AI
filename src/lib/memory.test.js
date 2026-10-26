@@ -17,6 +17,17 @@ test('portable messages retain engine provenance and timestamps', () => {
   assert.deepEqual(importMemory(exportMemory(memory)).conversations, memory.conversations);
 });
 
+test('portable voice and web preferences survive transfer with bounded voice controls', () => {
+  const memory=createMemory();
+  memory.settings={...memory.settings,voiceEngine:'kokoro',voiceName:'bf_emma',voiceSpeed:1.1,webResearch:true};
+  assert.deepEqual(importMemory(exportMemory(memory)).settings,memory.settings);
+  memory.settings={...memory.settings,voiceEngine:'unknown-provider',voiceName:'../../arbitrary-model',voiceSpeed:900};
+  const restored=importMemory(exportMemory(memory));
+  assert.equal(restored.settings.voiceEngine,'kokoro');
+  assert.equal(restored.settings.voiceName,'af_heart');
+  assert.equal(restored.settings.voiceSpeed,1.2);
+});
+
 test('storage failure is visible and a corrupt store is not overwritten by loading', () => {
   const original = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
   let writes = 0;

@@ -11,7 +11,7 @@ These are unsigned **1.0.0-preview.1** previews, not a production release. The e
 - The new completed Debian installer is 129,888,040 bytes, with SHA-256 `48f7de61107f9a0cd8341d10589643feaa0c0f2baaaf3a11232a0bc595ca9bbc`. Its package header, build receipt, byte count, and checksum passed catalog verification.
 - A developer-only extraction of that exact Debian package also passed the desktop smoke, including automatic engine startup. This checks the distributed package's contents; it does not replace installing it through a native desktop package manager.
 
-Actual neural inference remains unverified because this cloud environment blocks the model blob download destination. Trusted OS signing/notarization and native end-user installation testing remain unfinished. Successful engine startup is distinct from a downloaded model generating a reply.
+Actual language-model inference remains unverified because this cloud environment blocks the model blob download destination. Trusted OS signing/notarization and native end-user installation testing remain unfinished. Successful engine startup is distinct from a downloaded model generating a reply.
 
 ## Local package checks
 
@@ -43,3 +43,14 @@ The cloud smoke uses `--no-sandbox` only as a test-runner argument in this restr
 - [Run 6](https://github.com/Darius-Lea/Mother-AI/actions/runs/40229065175#artifacts), source `2b421f4`: Windows, macOS and Linux completed tests, builds and uploads after the nested Windows ASAR fix.
 
 The new workflow publishes verified EXE/PKG/DEB files to the approved `mother-preview` prerelease channel after all five target builds pass. Internal workflow artifacts are not consumer download links. Publication and a successful build remain separate from proving installation on the investor's actual computer.
+
+## Natural voice and web update
+
+- 231 automated checks passed, plus all 20 browser workflows (16 existing and four new voice/web cases).
+- The rebuilt Linux package launched its bundled Ollama engine and generated real, non-silent neural speech through the protected native desktop API. Renderer isolation, private API authentication and saved memory after restart passed.
+- The actual native private-browser controls passed isolation, restricted IPC, rejected local links, cleared session cookies and owner-log reading/clearing checks. This managed cloud blocked external page loading in that browser; a normal-network target-device check remains necessary.
+- The web reader performed actual successful HTTPS requests to GitHub and read this repository page. Its status identifies the verified public URL and time. Both free search endpoints were blocked in this cloud environment; search fixtures test parsing and failure handling, rather than claiming live search worked here.
+- Actual browser WASM and native CPU voice inference produced 4.55 seconds of 24 kHz audio for the included preview sentence. The sample is shipped in the UI. Native speech was also verified inside the packaged Electron application.
+- Official download discovery now works through the managed proxy and returned all five real, directly hosted preview installers.
+
+Windows/macOS native installation, trusted signing/notarization, broad website compatibility and language-model inference remain separate verification items. The product is still a first-release preview.

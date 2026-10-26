@@ -17,7 +17,7 @@ export function createMemory() {
     conversations: [],
     knowledge: [],
     feedback: [],
-    settings: { model: '', voice: true, reducedMotion: false, setupVisited: false },
+    settings: { model: '', voice: true, voiceEngine: 'kokoro', voiceName: 'af_heart', voiceSpeed: 1, webResearch: false, reducedMotion: false, setupVisited: false },
   };
 }
 
@@ -51,6 +51,10 @@ export function validateMemory(input) {
   next.settings = {
     model: cleanText(input.settings?.model, 200),
     voice: typeof input.settings?.voice === 'boolean' ? input.settings.voice : true,
+    voiceEngine: input.settings?.voiceEngine === 'system' ? 'system' : 'kokoro',
+    voiceName: ['af_heart','af_bella','bf_emma'].includes(input.settings?.voiceName) ? input.settings.voiceName : 'af_heart',
+    voiceSpeed: Number.isFinite(input.settings?.voiceSpeed) ? Math.min(1.2,Math.max(.8,input.settings.voiceSpeed)) : 1,
+    webResearch: input.settings?.webResearch === true,
     reducedMotion: input.settings?.reducedMotion === true,
     setupVisited: input.settings?.setupVisited === true,
   };

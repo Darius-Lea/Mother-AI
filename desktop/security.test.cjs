@@ -22,7 +22,8 @@ test('CSP rejects remote code, frames, and generic network access', () => {
   assert.match(CSP, /script-src 'self'/);
   assert.match(CSP, /connect-src 'self'/);
   assert.match(CSP, /frame-ancestors 'none'/);
-  assert.doesNotMatch(CSP, /unsafe-eval|https:\/\/\*/);
+  assert.match(CSP, /'wasm-unsafe-eval'/);
+  assert.doesNotMatch(CSP, /(?:^|\s)'unsafe-eval'|https:\/\/\*/);
 });
 
 test('desktop download navigation allows only direct preview installers from the approved repository', () => {

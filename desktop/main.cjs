@@ -14,6 +14,7 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { APP_ORIGIN, CSP, isAppUrl, isAllowedExternalUrl } = require('./security.cjs');
 const { createRuntimeManager } = require('./runtime.cjs');
+const { createPrivateBrowser } = require('./browser.cjs');
 
 // A stable secure origin preserves localStorage across random server ports and
 // app upgrades. Remote webpages never receive access to this protocol handler.
@@ -32,6 +33,7 @@ let localServer;
 let backendConnection;
 let backendApp;
 let runtimeManager;
+let privateBrowser;
 let protocolRegistered = false;
 let quitting = false;
 
@@ -67,6 +69,7 @@ async function showHelp() {
 }
 
 function registerNativeActions() {
+  const browser = () => privateBrowser ||= createPrivateBrowser({ parent: mainWindow, userData: app.getPath('userData') });
   ipcMain.handle('mother:system-info', event => {
     ensureTrustedSender(event);
     const memoryGiB = Math.round(os.totalmem() / (1024 ** 3));
@@ -79,6 +82,19 @@ function registerNativeActions() {
   ipcMain.handle('mother:runtime-start', async event => {
     ensureTrustedSender(event);
     return runtimeManager.ensureStarted();
+  });
+  ipcMain.handle('mother:browser-open', async (event, url) => {
+    ensureTrustedSender(event);
+    if (typeof url !== 'string' || url.length > 4096) return { ok: false, error: 'Enter one public HTTPS web address.' };
+    return browser().open(url);
+  });
+  ipcMain.handle('mother:browser-activity', event => {
+    ensureTrustedSender(event);
+    return browser().readActivity({ limit: 100 });
+  });
+  ipcMain.handle('mother:browser-clear-activity', event => {
+    ensureTrustedSender(event);
+    return browser().clearActivity();
   });
   ipcMain.handle('mother:help', async event => {
     ensureTrustedSender(event);
@@ -186,7 +202,7 @@ async function createWindow() {
   mainWindow.webContents.on('will-attach-webview', event => event.preventDefault());
   mainWindow.webContents.on('render-process-gone', (_event, details) => log(`Renderer stopped: ${details.reason}`));
   mainWindow.once('ready-to-show', () => mainWindow?.show());
-  mainWindow.on('closed', () => { mainWindow = null; });
+  mainWindow.on('closed', () => { void privateBrowser?.close(); privateBrowser = null; mainWindow = null; });
   await mainWindow.loadURL(`${APP_ORIGIN}/`);
   log(`Application started (${process.platform}/${process.arch}, version ${app.getVersion()}).`);
   if (process.env.MOTHER_DESKTOP_TEST === '1' && process.env.MOTHER_DESKTOP_AUTO_EXIT === '1') {
@@ -232,6 +248,7 @@ if (!singleInstance) {
     quitting = true;
     backendApp?.locals.shutdown?.();
     runtimeManager?.stop();
+    void privateBrowser?.close();
     localServer?.close();
     localServer?.closeAllConnections?.();
   });

@@ -1,10 +1,14 @@
 import { _electron as electron } from '@playwright/test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, mkdir, copyFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const temporary = await mkdtemp(path.join(tmpdir(), 'mother-desktop-smoke-'));
+if(process.env.MOTHER_EXPECT_NATIVE_VOICE==='1' && process.env.MOTHER_VOICE_MODEL){
+  const directory=path.join(temporary,'service','voice');await mkdir(directory,{recursive:true});
+  await copyFile(process.env.MOTHER_VOICE_MODEL,path.join(directory,'kokoro-v1.0.int8.onnx'));
+}
 const executablePath = process.env.MOTHER_DESKTOP_EXECUTABLE || path.resolve('node_modules/electron/dist/electron');
 const appArgument = process.env.MOTHER_DESKTOP_EXECUTABLE ? [] : [path.resolve('.')];
 const launch = () => electron.launch({
@@ -35,6 +39,19 @@ try {
   assert.equal(checks.processAccess, 'undefined');
   assert.ok(!checks.bridgeKeys.some(key => /token|exec|shell|readFile/.test(key)));
   assert.match(checks.csp, /connect-src 'self'/);
+  if(process.env.MOTHER_EXPECT_NATIVE_VOICE==='1'){
+    const spoken=await window.evaluate(async()=>{
+      const headers={'Content-Type':'application/json'};
+      const prepare=await fetch('/api/voice/prepare',{method:'POST',headers,body:'{}'});
+      const setup=await prepare.json();if(!prepare.ok)throw Error(setup.error);
+      const response=await fetch('/api/voice/synthesize',{method:'POST',headers,body:JSON.stringify({text:"Hello. I'm Mother.",voice:'af_heart',speed:1})});
+      if(!response.ok)throw Error((await response.json()).error);
+      const samples=new Float32Array(await response.arrayBuffer());
+      return {samples:samples.length,finite:samples.every(Number.isFinite),rms:Math.sqrt(samples.reduce((sum,x)=>sum+x*x,0)/samples.length)};
+    });
+    assert.ok(spoken.samples>24000);assert.equal(spoken.finite,true);assert.ok(spoken.rms>.001);
+    console.log('Actual packaged native neural voice generated verified non-silent audio through the private desktop API.');
+  }
   if (process.env.MOTHER_EXPECT_BUNDLED_RUNTIME === '1') {
     const deadline = Date.now() + 40000;
     let engine;

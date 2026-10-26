@@ -13,7 +13,7 @@ self.addEventListener('fetch', event => {
       if (response.ok) { const copy=response.clone();caches.open(CACHE).then(cache=>cache.put('/index.html',copy)); }
       return response;
     }).catch(async () => (await caches.match('/index.html')) || Response.error()));
-  } else if (/\.(js|css|svg|png|webmanifest)$/.test(url.pathname)) {
+  } else if (/\.(js|mjs|wasm|css|svg|png|webmanifest)$/.test(url.pathname) || /^\/voices\/(?:af_heart|af_bella|bf_emma)\.bin$/.test(url.pathname)) {
     event.respondWith(caches.match(request).then(cached => cached || fetch(request).then(response => {
       if(response.ok) {const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(request,copy));}
       return response;

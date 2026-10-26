@@ -473,12 +473,12 @@ function makeMother(scene, reducedMotion) {
   };
 }
 
-export default function MotherScene({phase='assembling',activity='idle',gesture='welcome',reducedMotion=false,onReady}) {
+export default function MotherScene({phase='assembling',activity='idle',gesture='welcome',reducedMotion=false,frameRate=60,onReady}) {
   const host=useRef(null);
   const state=useRef({phase,activity,gesture});
   const readyCallback=useRef(onReady);
   const [failed,setFailed]=useState(false);
-  state.current={phase,activity,gesture};
+  state.current={phase,activity,gesture,frameRate};
   readyCallback.current=onReady;
 
   useEffect(()=>{
@@ -528,15 +528,19 @@ export default function MotherScene({phase='assembling',activity='idle',gesture=
       observer=new ResizeObserver(resize);observer.observe(container);resize();
       const clock=new THREE.Clock();
       let ready=false;
-      const animate=()=>{
+      let lastRender=-Infinity;
+      const animate=(now=0)=>{
         if(disposed)return;
+        frame=requestAnimationFrame(animate);
+        const fps=Math.min(60,Math.max(4,Number(state.current.frameRate)||60));
+        if(now-lastRender<1000/fps)return;
+        lastRender=now;
         const delta=Math.min(clock.getDelta(),.07),time=clock.elapsedTime;
         const assembly=mother.update(time,delta,state.current);
         if(state.current.phase==='dormant')ready=false;
         if(assembly>.975&&!ready){ready=true;readyCallback.current?.();}
         controls.update();
         composer.render();
-        frame=requestAnimationFrame(animate);
       };
       animate();
     }catch(error){

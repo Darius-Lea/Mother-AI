@@ -2,6 +2,8 @@ appId: ai.mother.desktop
 productName: Mother AI
 executableName: mother
 asar: true
+asarUnpack:
+  - node_modules/onnxruntime-node/bin/**
 compression: maximum
 npmRebuild: false
 afterAllArtifactBuild: desktop/after-build.cjs
@@ -27,6 +29,14 @@ files:
 extraMetadata:
   main: desktop/main.cjs
 win:
+  extraResources:
+    - from: .runtime/ollama/lib/ollama
+      to: app.asar.unpacked/node_modules/onnxruntime-node/bin/napi-v6/win32/${arch}
+      filter:
+        - vcruntime*.dll
+        - msvcp*.dll
+        - concrt*.dll
+        - vccorlib*.dll
   target:
     - target: nsis
       arch: [x64, arm64]

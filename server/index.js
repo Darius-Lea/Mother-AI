@@ -12,6 +12,8 @@ import {createKaliRouter} from './kali.js';
 import { DatasetError, inspectDataset } from './datasets.js';
 import {deploymentConfig,publicCapabilities} from './deployment.js';
 import {createDistributionCatalog} from './distribution.js';
+import {createWebRouter} from './web.js';
+import {createVoiceRouter} from './voice.js';
 
 /** The browser may not access the local brain through an attacker-owned DNS name. */
 export function isAllowedHostHeader(header, allowedHosts = []) {
@@ -29,7 +31,7 @@ export function isAllowedHostHeader(header, allowedHosts = []) {
   });
 }
 
-export function createApp({ fetchImpl = fetch, distributionFetchImpl = fetch, inspect = inspectDataset, desktopToken, dataDirectory = process.env.MOTHER_DATA_DIR || path.join(os.homedir(), '.mother-ai'), workspaceRoot, mode = deploymentConfig(process.env,desktopToken).mode, allowedHosts = deploymentConfig(process.env,desktopToken).allowedHosts } = {}) {
+export function createApp({ fetchImpl = fetch, distributionFetchImpl, webOptions = {}, voiceOptions = {}, inspect = inspectDataset, desktopToken, dataDirectory = process.env.MOTHER_DATA_DIR || path.join(os.homedir(), '.mother-ai'), workspaceRoot, mode = deploymentConfig(process.env,desktopToken).mode, allowedHosts = deploymentConfig(process.env,desktopToken).allowedHosts } = {}) {
   const app = express();
   app.disable('x-powered-by');
   const hostedPreview=mode==='hosted-preview';
@@ -45,9 +47,13 @@ export function createApp({ fetchImpl = fetch, distributionFetchImpl = fetch, in
   app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
+    // All app assets, voice data and workers are same-origin. Isolation permits
+    // the neural voice's WASM engine to share CPU work across bounded threads.
+    res.setHeader('Cross-Origin-Opener-Policy','same-origin');
+    res.setHeader('Cross-Origin-Embedder-Policy','require-corp');
     if(hostedPreview){
       res.setHeader('X-Frame-Options','DENY');
-      res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'");
+      res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'");
     }
     if (!isAllowedHostHeader(req.get('host'), allowedHosts)) {
       return res.status(403).json({ error: 'Untrusted Host header. Use localhost, a literal IP address, or an explicitly configured MOTHER_ALLOWED_HOSTS hostname.' });
@@ -64,7 +70,8 @@ export function createApp({ fetchImpl = fetch, distributionFetchImpl = fetch, in
     next();
   });
   app.use('/api',(req,res,next)=>{
-    if(hostedPreview&&!['/health','/models','/distribution'].includes(req.path)){
+    const voiceAsset=['GET','HEAD'].includes(req.method) && (req.path==='/voice/status'||req.path.startsWith('/voice/files/'));
+    if(hostedPreview&&!voiceAsset&&!['/health','/models','/distribution'].includes(req.path)){
       return res.status(403).json({error:'This web preview keeps computer controls private. Download Mother for local AI setup, projects, app permissions, and host security tools.',mode:'hosted-preview'});
     }
     next();
@@ -83,7 +90,11 @@ export function createApp({ fetchImpl = fetch, distributionFetchImpl = fetch, in
   app.use('/api/workspace',createWorkspaceRouter({rootDirectory:workspaceRoot}));
   const securityRouter=createKaliRouter();
   app.use('/api/security',securityRouter);
-  app.locals.shutdown=()=>{modelRouter.shutdown?.();securityRouter.shutdown?.();};
+  const webRouter=createWebRouter({dataDirectory:path.join(dataDirectory,'web'),...webOptions});
+  app.use('/api/web',webRouter);
+  const voiceRouter=createVoiceRouter({directory:path.join(dataDirectory,'voice'),nativeSynthesis:!hostedPreview,...voiceOptions});
+  app.use('/api/voice',voiceRouter);
+  app.locals.shutdown=()=>{modelRouter.shutdown?.();securityRouter.shutdown?.();webRouter.shutdown?.();voiceRouter.shutdown?.();};
 
   app.post('/api/datasets/inspect', async (req, res) => {
     if (typeof req.body?.url !== 'string' || req.body.url.length > 4096) return res.status(400).json({ error: 'Provide one public HTTPS dataset URL.' });

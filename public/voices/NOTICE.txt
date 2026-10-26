@@ -1,0 +1,5 @@
+Kokoro voice embeddings: af_heart, af_bella, bf_emma.
+Source: kokoro-js npm package version 1.2.1, Apache-2.0.
+https://www.npmjs.com/package/kokoro-js/v/1.2.1
+Upstream: https://github.com/hexgrad/kokoro
+These are preset synthetic voice embeddings, not recordings of the user.

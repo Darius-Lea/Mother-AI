@@ -16,3 +16,5 @@ services:
         value: hosted-preview
       - key: ELECTRON_SKIP_BINARY_DOWNLOAD
         value: "1"
+      - key: ONNXRUNTIME_NODE_INSTALL
+        value: skip

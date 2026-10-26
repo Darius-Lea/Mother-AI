@@ -23,13 +23,15 @@ test('public preview serves health, capability and download metadata without pro
 
 test('public preview rejects computer controls and app grants before invoking services',async t=>{
   const {base,invoked}=await serverFor(t);
-  for(const endpoint of ['/api/workspace/status','/api/integrations','/api/connect/status','/api/security/capabilities','/api/setup/status']){
+  for(const endpoint of ['/api/workspace/status','/api/integrations','/api/connect/status','/api/security/capabilities','/api/setup/status','/api/web/status','/api/web/activity']){
     const response=await fetch(base+endpoint);assert.equal(response.status,403);assert.match((await response.json()).error,/web preview/);
   }
-  for(const endpoint of ['/api/workspace/open','/api/setup/pull','/api/chat','/api/datasets/inspect']){
+  for(const endpoint of ['/api/workspace/open','/api/setup/pull','/api/chat','/api/datasets/inspect','/api/web/search','/api/web/read','/api/voice/prepare','/api/voice/synthesize']){
     const response=await fetch(base+endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});assert.equal(response.status,403);
   }
   assert.equal(invoked(),false);
+  const voice=await fetch(base+'/api/voice/status');assert.equal(voice.status,200);assert.equal((await voice.json()).model,'Kokoro 82M');
+  assert.equal((await fetch(base+'/api/voice/files/../../web/activity')).status,403);
 });
 
 test('Render legacy Node entry starts a web server without Electron and honors the provider port',async t=>{

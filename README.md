@@ -21,12 +21,14 @@ Mother starts her included local AI engine automatically, or reuses a compatible
 
 No paid API key is required. Larger models use more storage and memory and can be slow on CPU. Their names do not establish equivalence with ChatGPT, Codex, or Claude. The local model generates neural answers only when it is installed and running. Until then Mother explicitly uses a small **Offline guide**; that guide is not neural AI.
 
-Real neural inference has not been verified in the current cloud machine: official model download destinations have returned network-policy HTTP 403. No credentials are missing. See [model setup and hardware](docs/MODELS.md).
+Local language-model inference has not been verified in the current cloud machine: official model download destinations have returned network-policy HTTP 403. No credentials are missing. See [model setup and hardware](docs/MODELS.md).
 
 ## What you can do
 
 - Explore Mother's real 3D body, assembly, facial motion, arms, fingers and speech gestures.
 - Converse with a connected free local neural model, or use the clearly labeled offline guide.
+- Hear Mother through a free natural neural voice; preview Heart before downloading and choose Heart, Bella or Emma in **Mother’s voice**. See [voice setup](docs/VOICE.md).
+- Read public HTTPS sources, use conversation research, open the isolated desktop browser, and inspect your owner activity log in **Web & browser**. See [web access](docs/WEB.md) and [private browser](docs/PRIVATE-BROWSER.md).
 - Review dataset links or files, approve sources, and retrieve relevant excerpts.
 - Save feedback and corrections and export reviewed teaching examples as JSONL. This does not automatically retrain model weights.
 - Export/import portable memory to another Mother installation or a USB drive.
@@ -72,4 +74,4 @@ The runtime-preparation command above is a Linux x64 developer example; use `win
 
 The optional `npm run package:portable` creates a **developer source archive**, not a consumer installer. Compatible desktops still need their own model files. Packaged ASAR resources keep implementation files outside the normal user experience, but cannot prevent a device owner from inspecting software. Never embed credentials in distributed client code.
 
-Memory is stored locally in the browser profile and readable JSON exports. It is not an encrypted vault. Browser/device speech availability varies; recognition may use browser-provider servers. See [architecture](docs/ARCHITECTURE.md), [local API](server/README.md), and the feature status before deploying.
+Memory is stored locally in the browser profile and readable JSON exports. It is not an encrypted vault. Neural speech is local to the browser or Mother host; basic device speech and recognition may use provider services. Websites can still log IP addresses and activity. Owner web logs stay outside model prompts. See [architecture](docs/ARCHITECTURE.md), [local API](server/README.md), and the feature status before deploying.

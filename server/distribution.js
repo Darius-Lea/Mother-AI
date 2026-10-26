@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import packageInfo from '../package.json' with { type: 'json' };
 import { normalizeInstaller, PREVIEW_MANIFEST_URL } from './downloads-validation.js';
+import {fetchOfficialAsset} from './https-assets.js';
 
 const MAX_CATALOG_BYTES = 64 * 1024;
 const allowedRedirectHosts = new Set(['github.com', 'release-assets.githubusercontent.com']);
@@ -55,7 +56,7 @@ async function readRemote(fetchImpl, signal) {
 
 /** The public catalog contains direct installer links, never CI artifacts or paths. */
 export function createDistributionCatalog({
-  fetchImpl = fetch,
+  fetchImpl = fetchOfficialAsset,
   manifestFile = fileURLToPath(new URL('../public/downloads.json', import.meta.url)),
   releaseRoot = fileURLToPath(new URL('../releases', import.meta.url)),
   now = Date.now,

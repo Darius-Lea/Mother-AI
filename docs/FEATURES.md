@@ -2,14 +2,14 @@
 
 Mother is a local-first application foundation, not a recreated frontier-model training laboratory. A model's reasoning, coding skill, speed, and reliability depend on the selected model and available hardware. No tested benchmark establishes equivalence with ChatGPT, Codex, Claude, or the frontier models from OpenAI and Anthropic. Open-weight local models can be useful without a paid API; they are not guaranteed to match those systems.
 
-Status describes implemented behavior, not all-platform certification. Tests with an injected model verify software integration; they do not establish the quality of an actually installed model. In this cloud build, real neural inference remains unverified because official model downloads have been blocked by the managed network policy.
+Status describes implemented behavior, not all-platform certification. Tests with an injected model verify software integration; they do not establish the quality of an actually installed model. In this cloud build, local language-model replies remain unverified because official model downloads have been blocked by the managed network policy. Neural speech has been verified separately.
 
 | Reference-sheet requirement | Status | Current behavior and practical limit |
 | --- | --- | --- |
 | Feminine, three-dimensional blue and gold particle humanoid | Implemented | Procedural geometry, face, eyes, particle hair, chest core, full body, and articulated limbs. A rendered visual, not physical nanotechnology. |
 | Spark, rise, assembly, awakening, disassembly | Implemented visual sequence | The live 3D figure assembles, idles, and disperses. This is an animation, not creation of a new consciousness. |
 | Turn, move, arms, hands, speech gestures | Partial | Orbit rotation, pose movement, fingers, arm gestures, breathing, blinking, and speaking animation. No physical body, autonomous scene navigation, or motion capture. |
-| Interactive voice, emotional expression | Partial | Browser speech synthesis and optional speech recognition, with availability depending on the device. Recognition may use browser-provider servers. No bundled high-quality offline voice model or proven emotional understanding. |
+| Interactive voice, emotional expression | Partial | Free Kokoro neural speech with three profiles, verified model download, native desktop CPU inference where supported and browser WASM fallback. A real generated sample is included. Microphone recognition varies by browser and may use provider servers. No proven emotional understanding. |
 | Wake words, always listening | Not implemented | User starts microphone input explicitly. Background hotword recognition is not provided. |
 | Cinematic startup, awakening and shutdown sounds | Not implemented | No complete reference-sheet sound design is bundled. |
 | Free neural conversations | Implemented integration; runtime required | A local Ollama service and an installed compatible open-weight model generate actual responses. A clearly labeled rule-based offline guide works separately. |
@@ -22,7 +22,7 @@ Status describes implemented behavior, not all-platform certification. Tests wit
 | Long-term memory and conversation context | Implemented, bounded | Browser-local conversations, profile, approved source excerpts, and reviewed corrections. Memory is not an encrypted credential vault. |
 | Learning from safe dataset links and files | Implemented reference workflow | Bounded text inspection, source preview, SHA-256 fingerprints, and explicit approval. Public HTTPS and a checksum do not certify truth, license, or freedom from poisoning. |
 | Active training and feedback | Partial | Ratings, corrections, reference retrieval, and curated teaching-example JSONL exports. No automatic neural weight updates, training evaluation, rollback of trained models, or autonomous self-modification. |
-| Internet research and verification 24/7 | Partial source access only | Controlled dataset downloads. No autonomous browsing, comprehensive fact verification, or continuous research agent. |
+| Internet research and verification 24/7 | Partial, user directed | Public HTTPS reader, free search endpoints, conversation research toggle, reviewed source attachment and an isolated native browser. Actual public-page access verified; providers can block search. No continuous autonomous research agent or guarantee of factual correctness/anonymity. |
 | Programming assistant that edits projects | Partial, approval based | Selected local folders, code inspection, editable change proposals, stale-file checks, explicit apply, and guarded rollback. No unrestricted shell or automated deployment agent. |
 | Red teaming and cybersecurity | Partial defensive tools | Local file fingerprints, code pattern review, model discussion, and a limited Kali-compatible tool bridge with approved single-host Nmap checks when Nmap is installed. No full Kali suite, malware scanner, or proof of security. |
 | Connect to other applications | Implemented scoped interface | User-created app grants, individually scoped/revocable bearer tokens, actual chat and static-code-review endpoints. Other applications need adapters that use these interfaces. |
@@ -34,7 +34,7 @@ Status describes implemented behavior, not all-platform certification. Tests wit
 | Self healing, self building and instant updates | Not implemented autonomously | No model-directed self-modification, verified automatic updater, or error-repair system. |
 | Permission controls and approval for sensitive actions | Partial | Scoped integration grants, desktop session protection, selected coding workspace, explicit change review/apply, and data-source approval. No complete organization-wide authorization system. |
 | End-to-end encryption and encrypted credentials | Not implemented as a general vault | Integration tokens are stored as hashes. Browser memory/JSON exports are readable. Transport and privacy depend on deployment; do not claim universal end-to-end encryption. |
-| Audit logs and compliance | Not implemented as a complete system | No certified compliance program or comprehensive immutable audit trail. |
+| Audit logs and compliance | Partial owner activity | Bounded local web-research and browser metadata logs, protected owner access, rotation and clearing. Logs stay outside model context. No complete immutable forensic archive or certified compliance program. |
 | Tiny package, minimal memory, instant response | Hardware dependent | The graphic has a resource cost; neural models can occupy several gigabytes and use substantial RAM/compute. No universal performance guarantee. |
 
 ## Connecting an application today

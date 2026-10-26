@@ -12,7 +12,7 @@ const { verifyBundle } = require('./runtime.cjs');
 function validateArchive(archive, projectRoot) {
   const entries = asar.listPackage(archive).map(name => name.replaceAll('\\', '/'));
   let checked = 0;
-  for (const name of entries.filter(entry => /^\/server\/.*\.js$/.test(entry) || /^\/desktop\/[^/]+\.cjs$/.test(entry))) {
+  for (const name of entries.filter(entry => /^\/server\/.*\.js$/.test(entry) || /^\/desktop\/[^/]+\.(?:cjs|js)$/.test(entry))) {
     const relative = name.slice(1);
     // ASAR's lookup uses the host path separator internally. Keep listing
     // comparisons portable, but convert member names back to native paths.
@@ -23,7 +23,7 @@ function validateArchive(archive, projectRoot) {
     if (syntax.status !== 0) throw new Error(`Packaged source does not parse: ${relative}\n${syntax.stderr}`);
     checked++;
   }
-  for (const name of entries.filter(entry => entry.startsWith('/dist/'))) {
+  for (const name of entries.filter(entry => entry.startsWith('/dist/') || /^\/desktop\/.*\.(?:html|css)$/.test(entry))) {
     const source = path.join(projectRoot, name.slice(1));
     if (!fs.statSync(source).isFile()) continue;
     if (!asar.extractFile(archive, path.normalize(name.slice(1))).equals(fs.readFileSync(source))) throw new Error(`Packaged interface changed during build: ${name}. Rebuild from an unchanged source tree.`);
