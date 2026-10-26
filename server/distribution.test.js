@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile, rm, mkdir } from 'node:fs/promises';
+import { mkdtemp, writeFile, rm, mkdir, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import packageInfo from '../package.json' with { type: 'json' };
@@ -13,7 +13,9 @@ const installer = { filename, version, platform:'windows', architecture:'x64', f
 const manifest = { version, artifacts:[installer] };
 
 async function fixture(t, options={}) {
-  const directory = await mkdtemp(path.join(tmpdir(),'mother-downloads-'));
+  // macOS /var and Windows short temp paths can alias their canonical location.
+  // The catalog intentionally returns real paths for confinement checks.
+  const directory = await realpath(await mkdtemp(path.join(tmpdir(),'mother-downloads-')));
   t.after(()=>rm(directory,{recursive:true,force:true}));
   const manifestFile = path.join(directory,'downloads.json');
   const releaseRoot = path.join(directory,'releases');
