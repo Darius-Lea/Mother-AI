@@ -35,14 +35,21 @@ jobs:
         with:
           python-version: '3.12'
       - run: npm ci
-      - run: npm test
+      - name: Check application
+        shell: bash
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee desktop-tests.log
       - name: Cache verified neural runtime
         uses: actions/cache@v4
         with:
           path: .runtime/ollama
           key: ollama-0.40.11-${{ matrix.platform }}-${{ matrix.arch }}-${{ hashFiles('scripts/prepare-runtime.py') }}
       - name: Prepare bundled neural runtime
-        run: python scripts/prepare-runtime.py --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}
+        shell: bash
+        run: |
+          set -o pipefail
+          python scripts/prepare-runtime.py --platform ${{ matrix.platform }} --arch ${{ matrix.arch }} 2>&1 | tee desktop-runtime.log
       - name: Build native installers
         shell: bash
         run: |
@@ -52,17 +59,22 @@ jobs:
         if: failure()
         shell: bash
         run: |
-          if [ -f desktop-build.log ]; then
-            printf '### Installer build diagnostics\n\n```text\n' >> "$GITHUB_STEP_SUMMARY"
-            tail -n 80 desktop-build.log >> "$GITHUB_STEP_SUMMARY"
-            printf '\n```\n' >> "$GITHUB_STEP_SUMMARY"
-          fi
+          for log in desktop-tests.log desktop-runtime.log desktop-build.log; do
+            if [ -f "$log" ]; then
+              printf '### %s\n\n```text\n' "$log" >> "$GITHUB_STEP_SUMMARY"
+              tail -n 100 "$log" >> "$GITHUB_STEP_SUMMARY"
+              printf '\n```\n' >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
       - name: Save installer diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: Mother-AI-${{ matrix.platform }}-${{ matrix.arch }}-build-diagnostics
-          path: desktop-build.log
+          path: |
+            desktop-tests.log
+            desktop-runtime.log
+            desktop-build.log
           if-no-files-found: ignore
           retention-days: 14
       - name: Save completed installers for publication
