@@ -59,6 +59,7 @@ jobs:
         if: failure()
         shell: bash
         run: |
+          node scripts/ci-diagnostics.mjs
           for log in desktop-tests.log desktop-runtime.log desktop-build.log; do
             if [ -f "$log" ]; then
               printf '### %s\n\n```text\n' "$log" >> "$GITHUB_STEP_SUMMARY"
