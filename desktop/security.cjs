@@ -20,7 +20,8 @@ function isAllowedExternalUrl(value) {
     const url = new URL(value);
     if (url.protocol !== 'https:' || url.username || url.password || (url.port && url.port !== '443')) return false;
     return (url.hostname === 'ollama.com' && /^\/download(?:\/(?:windows|mac|linux))?\/?$/.test(url.pathname))
-      || (url.hostname === 'github.com' && /^\/Darius-Lea\/Mother-AI(?:\/.*)?$/.test(url.pathname));
+      || (url.hostname === 'github.com' && (/^\/Darius-Lea\/Mother-AI\/?$/.test(url.pathname)
+        || /^\/Darius-Lea\/Mother-AI\/releases\/download\/mother-preview\/Mother-AI-[0-9A-Za-z.+_-]+\.(?:exe|pkg|deb)$/.test(url.pathname)) && !url.search && !url.hash);
   } catch { return false; }
 }
 

@@ -4,7 +4,6 @@ import path from 'node:path';
 import net from 'node:net';
 import os from 'node:os';
 import {timingSafeEqual} from 'node:crypto';
-import {promises as fs} from 'node:fs';
 import {createLocalBrain} from './brain.js';
 import {createModelRouter} from './models.js';
 import {createIntegrationRouters} from './integrations.js';
@@ -12,6 +11,7 @@ import {createWorkspaceRouter} from './workspace.js';
 import {createKaliRouter} from './kali.js';
 import { DatasetError, inspectDataset } from './datasets.js';
 import {deploymentConfig,publicCapabilities} from './deployment.js';
+import {createDistributionCatalog} from './distribution.js';
 
 /** The browser may not access the local brain through an attacker-owned DNS name. */
 export function isAllowedHostHeader(header, allowedHosts = []) {
@@ -29,7 +29,7 @@ export function isAllowedHostHeader(header, allowedHosts = []) {
   });
 }
 
-export function createApp({ fetchImpl = fetch, inspect = inspectDataset, desktopToken, dataDirectory = process.env.MOTHER_DATA_DIR || path.join(os.homedir(), '.mother-ai'), workspaceRoot, mode = deploymentConfig(process.env,desktopToken).mode, allowedHosts = deploymentConfig(process.env,desktopToken).allowedHosts } = {}) {
+export function createApp({ fetchImpl = fetch, distributionFetchImpl = fetch, inspect = inspectDataset, desktopToken, dataDirectory = process.env.MOTHER_DATA_DIR || path.join(os.homedir(), '.mother-ai'), workspaceRoot, mode = deploymentConfig(process.env,desktopToken).mode, allowedHosts = deploymentConfig(process.env,desktopToken).allowedHosts } = {}) {
   const app = express();
   app.disable('x-powered-by');
   const hostedPreview=mode==='hosted-preview';
@@ -91,19 +91,14 @@ export function createApp({ fetchImpl = fetch, inspect = inspectDataset, desktop
     catch (error) { res.status(error instanceof DatasetError ? error.status : 422).json({ error: error instanceof DatasetError ? error.message : 'Could not inspect this dataset.' }); }
   });
 
-  const releaseRoot=fileURLToPath(new URL('../releases',import.meta.url));
-  const manifestFile=fileURLToPath(new URL('../public/downloads.json',import.meta.url));
-  const distribution=async()=>{const links={desktopBuildsUrl:'https://github.com/Darius-Lea/Mother-AI/actions/workflows/desktop-installers.yml'};try{return {...JSON.parse(await fs.readFile(manifestFile,'utf8')),...links};}catch{return {version:'1.0.0-preview.1',artifacts:[],...links};}};
-  app.get('/api/distribution',async(_req,res)=>{res.setHeader('Cache-Control','no-store');res.json(await distribution());});
+  const distribution=createDistributionCatalog({fetchImpl:distributionFetchImpl});
+  app.get('/api/distribution',async(_req,res)=>{res.setHeader('Cache-Control','no-store');res.json(await distribution.catalog());});
   app.get('/downloads/:filename',async(req,res)=>{
-    const manifest=await distribution();const artifact=manifest.artifacts?.find(item=>item.filename===req.params.filename);
-    if(!artifact||path.basename(req.params.filename)!==req.params.filename)return res.status(404).json({error:'This installer is not available.'});
-    try {
-      const relative=artifact.relativePath || artifact.filename;
-      const candidate=await fs.realpath(path.join(releaseRoot,relative));const root=await fs.realpath(releaseRoot);
-      if(!candidate.startsWith(root+path.sep)||!(await fs.stat(candidate)).isFile())throw Error();
-      res.download(candidate,artifact.filename);
-    }catch{res.status(404).json({error:'This installer is not available on this machine.'});}
+    const filename=req.params.filename;
+    if(path.basename(filename)!==filename)return res.status(404).json({error:'This installer is not available.'});
+    const candidate=await distribution.localFile(filename);
+    if(!candidate)return res.status(404).json({error:'This installer is not available on this machine.'});
+    res.download(candidate,filename);
   });
   const distPath = fileURLToPath(new URL('../dist', import.meta.url));
   app.use(express.static(distPath, { index: false }));

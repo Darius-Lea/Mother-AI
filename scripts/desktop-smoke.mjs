@@ -35,6 +35,21 @@ try {
   assert.equal(checks.processAccess, 'undefined');
   assert.ok(!checks.bridgeKeys.some(key => /token|exec|shell|readFile/.test(key)));
   assert.match(checks.csp, /connect-src 'self'/);
+  if (process.env.MOTHER_EXPECT_BUNDLED_RUNTIME === '1') {
+    const deadline = Date.now() + 40000;
+    let engine;
+    do {
+      engine = await window.evaluate(() => window.motherDesktop.getRuntimeStatus());
+      if (engine.available || engine.state === 'error') break;
+      await new Promise(resolve => setTimeout(resolve, 250));
+    } while (Date.now() < deadline);
+    assert.equal(engine.available, true, engine.error || 'Bundled engine did not become ready.');
+    assert.equal(engine.source, 'bundled', 'This smoke requires a fresh bundled engine, not an existing external service.');
+    assert.equal(engine.version, '0.40.11');
+    const setup = await window.evaluate(() => fetch('/api/setup/status').then(response => response.json()));
+    assert.equal(setup.runtime.available, true);
+    console.log('Actual bundled AI engine started automatically and answered version/model-library requests. Model inference is a separate check.');
+  }
   const connection = await window.evaluate(async () => fetch('/api/integrations/info').then(response => response.json()));
   assert.ok(connection.baseUrl?.startsWith('http://127.0.0.1:'));
   const denied = await fetch(`${connection.baseUrl}/api/models`);

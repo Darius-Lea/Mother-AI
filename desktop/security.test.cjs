@@ -24,3 +24,9 @@ test('CSP rejects remote code, frames, and generic network access', () => {
   assert.match(CSP, /frame-ancestors 'none'/);
   assert.doesNotMatch(CSP, /unsafe-eval|https:\/\/\*/);
 });
+
+test('desktop download navigation allows only direct preview installers from the approved repository', () => {
+  const prefix = 'https://github.com/Darius-Lea/Mother-AI';
+  for (const extension of ['exe', 'pkg', 'deb']) assert.equal(isAllowedExternalUrl(`${prefix}/releases/download/mother-preview/Mother-AI-1.0.0-preview.1-win-x64.${extension}`), true);
+  for (const suffix of ['/actions', '/tree/main', '/releases/download/production/app.exe', '/releases/download/mother-preview/source.zip', '/releases/download/mother-preview/Mother-AI-1.0.0-win-x64.exe?redirect=evil']) assert.equal(isAllowedExternalUrl(`${prefix}${suffix}`), false);
+});

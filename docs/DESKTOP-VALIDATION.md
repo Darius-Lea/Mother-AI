@@ -1,6 +1,17 @@
 # Desktop preview validation
 
-Validation applies to the existing **1.0.0-preview.1** artifacts built from the pre-Render-fix application sources. These are unsigned previews, not a public production release.
+These are unsigned **1.0.0-preview.1** previews, not a production release. The earlier package results below are historical; they do not describe the new bundled-engine installer.
+
+## Direct-installer update
+
+- 187 Node checks passed, including archive/runtime integrity, safe extraction, engine lifecycle, catalog validation, publisher failure handling, API isolation, permissions, and existing application functions.
+- All 16 browser workflows passed, including automatic engine setup/retry, direct installer selection, unavailable builds, responsive hosted preview, WebGL, references, coding approval/restore and local memory.
+- Actual official runtime archive preparation and JavaScript integrity verification passed for Linux x64, Windows ARM64, and Mac ARM64. These cross-platform file checks do not establish native execution.
+- Actual source and packaged Linux desktop launches started the included Ollama 0.40.11 engine automatically. Version and installed-model-library requests succeeded. Restricted bridge, session-token enforcement, renderer isolation, and memory after restart also passed.
+- The new completed Debian installer is 129,888,040 bytes, with SHA-256 `48f7de61107f9a0cd8341d10589643feaa0c0f2baaaf3a11232a0bc595ca9bbc`. Its package header, build receipt, byte count, and checksum passed catalog verification.
+- A developer-only extraction of that exact Debian package also passed the desktop smoke, including automatic engine startup. This checks the distributed package's contents; it does not replace installing it through a native desktop package manager.
+
+Actual neural inference remains unverified because this cloud environment blocks the model blob download destination. Trusted OS signing/notarization and native end-user installation testing remain unfinished. Successful engine startup is distinct from a downloaded model generating a reply.
 
 ## Local package checks
 
@@ -28,6 +39,7 @@ The cloud smoke uses `--no-sandbox` only as a test-runner argument in this restr
 ## Native build workflows
 
 - [Run 2](https://github.com/Darius-Lea/Mother-AI/actions/runs/40194794730#artifacts), source `8bbbdd6`: Windows, macOS, and Linux builds and artifact uploads succeeded.
-- [Run 3](https://github.com/Darius-Lea/Mother-AI/actions/runs/40195081760#artifacts), source `1e6e5c8`: macOS and Linux tests/builds/uploads succeeded. Windows failed at `npm test` before packaging. The current source includes ASAR separator normalization plus a Windows-separator regression test, which must pass in a subsequent Windows build before claiming that issue resolved there.
+- [Run 3](https://github.com/Darius-Lea/Mother-AI/actions/runs/40195081760#artifacts), source `1e6e5c8`: macOS and Linux tests/builds/uploads succeeded. Windows failed at `npm test` before packaging.
+- [Run 6](https://github.com/Darius-Lea/Mother-AI/actions/runs/40229065175#artifacts), source `2b421f4`: Windows, macOS and Linux completed tests, builds and uploads after the nested Windows ASAR fix.
 
-GitHub artifact downloads require a signed-in GitHub session and are retained for the workflow's configured retention period. A successful artifact build is separate from publishing a public product release or proving installation on the investor's actual computer.
+The new workflow publishes verified EXE/PKG/DEB files to the approved `mother-preview` prerelease channel after all five target builds pass. Internal workflow artifacts are not consumer download links. Publication and a successful build remain separate from proving installation on the investor's actual computer.

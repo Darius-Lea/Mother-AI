@@ -1,23 +1,23 @@
 # Mother desktop downloads
 
-Mother can be packaged as a normal application with its own browser engine, local server, and Node runtime. People installing a built desktop artifact do not need to install Node, open a terminal, unpack project folders, or run developer commands. The application starts its local service itself.
+Mother's desktop installer includes her browser engine, local server, Node runtime, and verified local Ollama engine. People installing Mother do not need a terminal, project folders, ZIP extraction, or a separate engine installation.
 
 ## Download experience
 
-- **Windows:** open the `.exe` installer, follow the visible installation wizard, and launch Mother from Start or the desktop shortcut. The default is a per-user installation without an administrator service.
-- **Mac:** open the `.dmg` and drag Mother to Applications. Intel and Apple Silicon artifacts are separate.
-- **Linux:** open a `.deb` with the system package installer on Debian/Ubuntu, or use the AppImage on a compatible Linux desktop. AppImage execution/FUSE support depends on the distribution.
+- **Windows:** open the `.exe` installer and approve normal OS prompts. It installs for the current user, creates shortcuts, and opens Mother without a folder-selection wizard or administrator service.
+- **Mac:** open the `.pkg` and follow the standard OS installer, then open Mother from Applications or Launchpad. Intel and Apple Silicon installers are separate.
+- **Linux:** open the `.deb` with the system package installer on Debian/Ubuntu. Other Linux distributions need separate packaging support.
 - **Phones and tablets:** these desktop files cannot install on Android or iOS. The mobile product is the web app's Install/Add to Home Screen flow, and its neural API needs a compatible running server. Native mobile packages and on-device neural runtimes are separate development work.
 
-An artifact can be downloaded only after it has actually been built and distributed. The workflow below does not create a public download page or silently publish anything.
+The website's **Get Mother** page detects the device and links directly to the appropriate installer in the approved GitHub `mother-preview` prerelease channel. Downloads appear only after all supported builds finish and their receipts, package headers, byte counts, and SHA-256 values pass verification. A pending build never becomes a fabricated download link. GitHub Actions artifacts remain an internal build handoff, outside the consumer flow.
 
 ## First-run intelligence
 
-The desktop application bundles the Mother interface and local service, not a multi-gigabyte language model. Its first-run wizard can inspect this device, show model sizes, open the official Ollama download page, detect the installed service, and download a selected model through Mother's backend.
+The app starts its included engine automatically after verifying every bundled runtime file. A compatible existing local Ollama service is reused. The language model downloads separately inside Mother's wizard after the user approves its size and resource use.
 
-`window.motherDesktop.openOllamaDownload()` opens the official operating-system-specific download page in the user's browser. It does **not** claim to install Ollama automatically. Completing an official OS installer and any OS approval remains a visible user action. Mother never executes an unverified installer, bypasses package-signature checks, or hides a downloaded background service. Model downloads also require the user's explicit selection and enough disk space, RAM, and network access.
+The engine listens only on this computer. Model files stay in Mother's app-data directory. Closing Mother stops only the engine process she started; an existing separately running service is left alone. No background system service, elevated installer, or arbitrary executable path is exposed by the renderer.
 
-Once Ollama is installed, users should not need terminal commands for Mother's model-download step. The backend model-setup endpoints and wizard own that operation. Availability and the resulting model quality must be tested on the target device; a model name alone is not evidence of ChatGPT, Codex, or Claude parity.
+The backend model-setup endpoints and wizard handle model downloads, verification, progress and cancellation. Availability and quality must be tested on the target device; a model name alone is not evidence of ChatGPT, Codex, or Claude parity. See [automatic runtime](AUTOMATIC-RUNTIME.md) for build provenance and lifecycle details.
 
 ## Developer build commands
 
@@ -25,14 +25,15 @@ Use the pinned Node and package lock, then:
 
 ```sh
 npm ci
+python3 scripts/prepare-runtime.py --platform linux --arch x64
 npm run desktop
 npm run desktop:pack
-npm run desktop:dist
+npm run desktop:dist -- --x64 --publish never
 ```
 
 `desktop` opens the current local app. `desktop:pack` creates an unpacked development build. `desktop:dist` creates the host platform's configured distributable artifacts under `releases/desktop/`. `npm run desktop:linux` explicitly builds the x64 AppImage and Debian package on Linux.
 
-A manual GitHub Actions workflow, **Build Mother desktop installers**, builds Windows, macOS, and Linux installers on their corresponding operating systems and uploads them as workflow artifacts for review. It has read-only repository permissions and does not publish a release. Installing the Electron development dependency downloads the official Electron runtime; electron-builder may also download official packaging tools. Network access to those official release assets is required.
+The runtime-preparation command is a Linux x64 example; choose the matching platform and architecture for other targets. **Build Mother desktop installers** runs after every main push and on manual dispatch. Native Windows x64/arm64, Mac x64/arm64, and Linux x64 jobs have read-only repository permissions. Only the final publication job has permission to upload preview files. It rejects stale commits and incomplete builds, uploads content-addressed installers, then updates the small discovery catalog last. No production release is created.
 
 Code signing and macOS notarization are not configured. Builds are unsigned development distributions. Windows SmartScreen and macOS Gatekeeper can show warnings; do not claim those warnings have been eliminated or instruct users to disable platform protection. A production public download needs signing/notarization and testing on its target OS.
 
@@ -50,4 +51,4 @@ The renderer is sandboxed with context isolation and no Node integration. Produc
 
 The main process proxies its private `mother://app` scheme to a loopback-only server and injects a random per-session token. That token is never returned to JavaScript, saved in memory exports, or included in logs. Backend desktop-token middleware is required to protect local APIs. App-specific external connection routes use their own authorization and connection tokens.
 
-The preload bridge exposes only system information, the official Ollama download action, help, and a user-visible native project-folder picker. It has no generic shell, filesystem read, arbitrary IPC, or arbitrary URL-opening method. A selected folder path does not by itself authorize writes or code execution; the project connector must still enforce its own access rules.
+The preload bridge exposes only system information, included-engine status/retry, in-app help, and a user-visible native project-folder picker. It has no generic shell, filesystem read, arbitrary IPC, or arbitrary URL-opening method. A selected folder path does not by itself authorize writes or code execution; the project connector must still enforce its own access rules.

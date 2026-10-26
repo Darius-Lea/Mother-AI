@@ -70,7 +70,7 @@ export default function ConnectPanel({ memory, onMemoryChange, installAvailable=
           </select>
           <button type="button" className="button secondary" disabled={busy} onClick={refreshModels}>{busy ? 'Checking…' : 'Refresh'}</button>
         </div>
-        <details className="setup-details"><summary>Set up a free local brain</summary><p>Install <a href="https://ollama.com" target="_blank" rel="noreferrer">Ollama</a> on the computer hosting Mother. Then, in a terminal:</p><pre>ollama serve{'\n'}ollama pull qwen2.5:0.5b</pre><p>Run these in separate terminals if needed. The example is a small starter model; larger models may answer better but need more memory. Refresh here and select the model after the download completes.</p></details>
+        <p className="field-hint">The desktop app includes the free local AI engine. Open guided setup to download a suitable model and see its actual progress. No separate engine installation or terminal is needed.</p>
       </section>}
       <section className="connection-section">
         <div className="section-heading"><h3>Portable memory</h3><span className="badge">Local first</span></div>

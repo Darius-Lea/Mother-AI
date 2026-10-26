@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, Cpu, Download, ExternalLink, HardDrive, LoaderCircle, ShieldCheck, Sparkles, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, Cpu, Download, HardDrive, LoaderCircle, ShieldCheck, Sparkles, X } from 'lucide-react';
 
 const ACTIVE_STATES = new Set(['queued', 'downloading', 'verifying']);
 const modelName = (model) => typeof model === 'string' ? model : model?.name;
@@ -10,6 +10,7 @@ const steps = ['Welcome', 'Local intelligence', 'Choose a brain', 'Ready'];
 export default function SetupWizard({ onComplete, onClose }) {
   const [step, setStep] = useState(0);
   const [status, setStatus] = useState(null);
+  const [engine, setEngine] = useState(null);
   const [selected, setSelected] = useState('');
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -22,8 +23,7 @@ export default function SetupWizard({ onComplete, onClose }) {
   const heading = useRef(null);
   const pollInFlight = useRef(false);
   const taskActive = ACTIVE_STATES.has(task?.state);
-  const mobileClient = /Android|iPhone|iPad|iPod/i.test(globalThis.navigator?.userAgent || '') || (globalThis.navigator?.platform === 'MacIntel' && globalThis.navigator?.maxTouchPoints > 1);
-  const installerAvailable = !mobileClient && ['win32', 'darwin'].includes(status?.hardware?.platform);
+  const automaticEngine = typeof window.motherDesktop?.startRuntime === 'function';
   const installed = status?.models || [];
   const selectedInstalled = installed.some((model) => modelName(model) === selected);
   const selectedRecommendation = status?.recommendations?.find((model) => model.name === selected);
@@ -41,9 +41,13 @@ export default function SetupWizard({ onComplete, onClose }) {
   }, []);
 
   const refreshStatus = useCallback(async () => {
-    const result = await request('/status');
+    const [result, native] = await Promise.all([
+      request('/status'),
+      window.motherDesktop?.getRuntimeStatus?.().catch(() => ({ state: 'error', error: 'Mother could not check the local engine. Reopen Mother and try again.' })),
+    ]);
     if (!mounted.current) return result;
     setStatus(result);
+    if (native) setEngine(native);
     setSelected((current) => current || result.recommendedModel || modelName(result.models?.[0]) || result.recommendations?.find((model) => model.eligible)?.name || '');
     if (result.activeDownload) setTask(result.activeDownload);
     return result;
@@ -105,26 +109,16 @@ export default function SetupWizard({ onComplete, onClose }) {
   async function detect() {
     setBusy(true); setError(''); setNotice('');
     try {
+      const native = automaticEngine ? await window.motherDesktop.startRuntime() : null;
+      if (mounted.current && native) setEngine(native);
       const result = await refreshStatus();
       if (result.runtime?.available) {
         setNotice('Local intelligence service detected. Choose a model next.');
         if (result.activeDownload) { setTask(result.activeDownload); setStep(2); }
-      } else setNotice('Ollama is not running yet. Finish its installer, open Ollama, then check again.');
+      } else if (automaticEngine) setError(native?.error || 'The local engine is not ready yet. Try again, or continue with the offline guide.');
+      else setNotice('Get the Mother desktop app from Get Mother to use automatic local AI setup. You can keep using the offline guide here.');
     } catch (failure) { setError(failure.message); }
     finally { if (mounted.current) setBusy(false); }
-  }
-
-  async function openRuntimeDownload() {
-    setError('');
-    try {
-      if (window.motherDesktop?.openOllamaDownload) await window.motherDesktop.openOllamaDownload();
-      else {
-        const opened = window.open('https://ollama.com/download', '_blank', 'noopener,noreferrer');
-        // Some browsers intentionally return null for noopener. The official link remains visible below.
-        void opened;
-      }
-      setNotice(installerAvailable ? 'The official Ollama download page opens separately. Complete its normal Windows or Mac installer on the computer hosting Mother, open Ollama, then return here and select Check again.' : 'The official runtime information opens separately. Ollama must run on the computer hosting Mother. Linux setup may need an administrator; phones and tablets use Mother as a client of that computer.');
-    } catch (failure) { setError(failure.message || 'Could not open the official download page. Use the link below.'); }
   }
 
   async function beginDownload() {
@@ -169,7 +163,7 @@ export default function SetupWizard({ onComplete, onClose }) {
           <div className="setup-emblem"><Sparkles size={35} strokeWidth={1} /></div>
           <div className="eyebrow">A SIMPLE BEGINNING</div>
           <h2 id="setup-title" tabIndex={-1} ref={heading}>Let’s bring Mother to life.</h2>
-          <p id="setup-description">A few guided steps will connect Mother to a free neural model on the computer hosting her. Mother handles model selection and downloads; your operating system may need to install the free runtime separately.</p>
+          <p id="setup-description">Choose a free local model and Mother handles its download and setup. The desktop app includes the AI engine; you do not need a separate installer or a terminal.</p>
           <div className="setup-benefits"><div><ShieldCheck size={18} /><span><strong>Your conversations stay local</strong><small>Model inference runs on the computer hosting Mother.</small></span></div><div><Cpu size={18} /><span><strong>A brain suited to your hardware</strong><small>Mother recommends a model using the host computer’s total system memory.</small></span></div><div><HardDrive size={18} /><span><strong>Free software, real resources</strong><small>Model downloads use internet, storage, and your computer’s processing power.</small></span></div></div>
           <p className="field-hint">Mother combines open models, references, and tools. Capabilities depend on the selected model; this setup does not promise the performance of ChatGPT, Codex, or Claude.</p>
           {taskActive && <div className="notice">A model download is already running. Continue to view its actual progress.</div>}
@@ -177,10 +171,10 @@ export default function SetupWizard({ onComplete, onClose }) {
         {step === 1 && <>
           <div className="eyebrow">THE ENGINE BEHIND MOTHER</div>
           <h2 id="setup-title" tabIndex={-1} ref={heading}>Local intelligence, made simple.</h2>
-          <p id="setup-description">Ollama runs Mother’s free neural model. Mother checks the service on this server computer, not on a different device visiting it.</p>
-          <div className={`setup-runtime ${status?.runtime?.available ? 'connected' : ''}`}><span className="setup-runtime-icon"><Cpu size={23} /></span><div><strong>{status?.runtime?.available ? 'Ollama is ready' : 'Ollama is not connected yet'}</strong><small>{status?.runtime?.available ? `Local service${status.runtime.version ? ` · version ${status.runtime.version}` : ''}` : 'Install the free runtime, then Mother can download a model for you.'}</small></div>{status?.runtime?.available && <CheckCircle2 size={20} />}</div>
+          <p id="setup-description">Mother’s desktop app starts its included AI engine automatically. Your model runs on the computer hosting Mother and needs no paid API key.</p>
+          <div className={`setup-runtime ${status?.runtime?.available ? 'connected' : ''}`}><span className="setup-runtime-icon"><Cpu size={23} /></span><div><strong>{status?.runtime?.available ? 'Local engine is ready' : ['checking', 'starting'].includes(engine?.state) ? 'Starting the local engine…' : 'Local engine is not connected yet'}</strong><small>{status?.runtime?.available ? `Local service${status.runtime.version ? ` · version ${status.runtime.version}` : ''}` : automaticEngine ? engine?.error || 'Mother is checking her included engine. No separate installation is needed.' : 'Automatic engine setup is included in the Mother desktop app.'}</small></div>{status?.runtime?.available && <CheckCircle2 size={20} />}</div>
           {status?.hardware && <dl className="setup-hardware"><div><dt>System memory</dt><dd>{Number(status.hardware.totalMemoryGiB).toFixed(1)} GB</dd></div><div><dt>Processor</dt><dd>{status.hardware.cpuCount} logical cores</dd></div><div><dt>Platform</dt><dd>{status.hardware.platform} · {status.hardware.arch}</dd></div></dl>}
-          {!status?.runtime?.available && <div className="setup-runtime-actions"><button type="button" className="button primary" onClick={openRuntimeDownload}><Download size={15} /> {installerAvailable ? 'Get the free runtime' : 'Runtime setup information'} <ExternalLink size={13} /></button><p className="field-hint">{installerAvailable ? 'Complete the official installer and open Ollama. Your operating system may ask you to approve installation.' : mobileClient ? 'Phones and tablets connect to a compatible server host. Install the runtime on that host, not on this mobile client.' : 'Install Ollama on the computer hosting Mother. Linux installation may need an administrator or the official setup instructions.'} <a href="https://ollama.com/download" target="_blank" rel="noreferrer">Official download</a></p><button type="button" className="button secondary" onClick={detect} disabled={busy}>{busy ? <LoaderCircle size={14} className="spin" /> : <Cpu size={14} />} Check again</button></div>}
+          {!status?.runtime?.available && <div className="setup-runtime-actions"><p className="field-hint">{automaticEngine ? 'Mother manages the engine inside the app. If it cannot start, try again or reinstall Mother using the normal download button.' : 'For automatic local AI setup, download the desktop app from Get Mother. Phones and tablets use the web companion.'}</p><button type="button" className="button secondary" onClick={detect} disabled={busy}>{busy ? <LoaderCircle size={14} className="spin" /> : <Cpu size={14} />} {busy ? 'Starting…' : automaticEngine ? 'Start local engine' : 'Check again'}</button></div>}
           {status?.runtime?.available && <p className="success-message">No API key is required. The next step downloads a model only after you approve it.</p>}
         </>}
         {step === 2 && <>

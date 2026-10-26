@@ -1,22 +1,15 @@
-/**
- * Build the public catalog only from completed desktop builds.
- * After electron-builder exits successfully, scripts/desktop-verify-artifacts.cjs
- * writes <artifact>.build.json receipts. Run this script after that verification.
- * Missing receipts exclude an artifact; metadata/digest mismatches fail the scan.
- * Headers plus a build receipt do not establish OS launch testing, signing, or publication.
- */
+/** Catalog only completed consumer installers. No ZIPs, sources, portable apps,
+ * or bare executables are offered as setup packages. A receipt, file header and
+ * digest prove a completed build, not native installation testing or signing. */
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { lstat, open, readdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import packageInfo from '../package.json' with { type: 'json' };
+import { INSTALLER_NAME, PREVIEW_DOWNLOAD_BASE } from '../server/downloads-validation.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const packageInfo = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
-const releaseRoot = path.join(root, 'releases');
-const artifacts = [];
-const names = new Set();
-const allowedName = /^Mother-AI-([0-9][0-9A-Za-z.+_-]*)-(win|windows|mac|darwin|linux)-(x64|x86_64|amd64|arm64|aarch64|ia32)(?:-portable)?\.(exe|AppImage|deb|dmg)$/;
 
 async function checksum(file) {
   const hash = createHash('sha256');
@@ -24,80 +17,87 @@ async function checksum(file) {
   return hash.digest('hex');
 }
 
-async function verifyPackage(file, format, size) {
+async function verifyPackage(file, format) {
   const descriptor = await open(file, 'r');
   try {
-    const head = Buffer.alloc(12);
+    const head = Buffer.alloc(8);
     await descriptor.read(head, 0, head.length, 0);
-    if (format === 'exe' && head.subarray(0, 2).toString() !== 'MZ') throw new Error('Windows package is not an executable.');
-    if (format === 'AppImage' && (head.subarray(0, 4).toString('hex') !== '7f454c46' || head[8] !== 0x41 || head[9] !== 0x49)) throw new Error('AppImage signature is missing.');
-    if (format === 'deb' && head.subarray(0, 8).toString() !== '!<arch>\n') throw new Error('Debian package signature is missing.');
-    if (format === 'dmg') {
-      const tail = Buffer.alloc(4);
-      await descriptor.read(tail, 0, 4, size - 512);
-      if (tail.toString() !== 'koly') throw new Error('Disk image trailer is missing.');
-    }
+    if (format === 'exe' && head.subarray(0,2).toString() !== 'MZ') throw Error('Windows installer is not an executable.');
+    if (format === 'deb' && head.toString() !== '!<arch>\n') throw Error('Debian package signature is missing.');
+    if (format === 'pkg' && head.subarray(0,4).toString() !== 'xar!') throw Error('Mac installer package signature is missing.');
   } finally { await descriptor.close(); }
 }
 
-async function scan(directory) {
-  let entries;
-  try { entries = await readdir(directory, { withFileTypes: true }); }
-  catch (error) { if (error.code === 'ENOENT' && directory === releaseRoot) return; throw error; }
-  for (const entry of entries) {
-    const file = path.join(directory, entry.name);
-    // An unpacked application executable is not a downloadable installer.
-    if (entry.isDirectory()) {
-      if (!/(?:unpacked|\.app$|node_modules|builder-effective-config)/i.test(entry.name)) await scan(file);
-      continue;
-    }
-    if (!entry.isFile() || entry.isSymbolicLink()) continue;
-    const match = entry.name.match(allowedName);
-    if (!match || match[1] !== packageInfo.version) continue;
-    let receiptStat;
-    try { receiptStat = await lstat(`${file}.build.json`); }
-    catch (error) {
-      if (error.code === 'ENOENT') {
-        console.log(`Skipping package without a successful-build receipt: ${entry.name}`);
+export async function buildReleaseManifest({ directory = path.join(root,'releases'), version = packageInfo.version, baseUrl = '' } = {}) {
+  if (baseUrl && baseUrl !== PREVIEW_DOWNLOAD_BASE) throw Error('Use the approved Mother preview download location.');
+  const artifacts = [];
+  const names = new Set();
+  let canonicalRoot;
+  try { canonicalRoot = await realpath(directory); }
+  catch (error) {
+    if (error.code === 'ENOENT') return { version, generatedAt: new Date().toISOString(), artifacts };
+    throw error;
+  }
+
+  async function scan(folder) {
+    for (const entry of await readdir(folder,{withFileTypes:true})) {
+      const file = path.join(folder,entry.name);
+      if (entry.isDirectory()) {
+        if (!/(?:unpacked|\.app$|node_modules|builder-effective-config)/i.test(entry.name)) await scan(file);
         continue;
       }
-      throw error;
+      if (!entry.isFile() || entry.isSymbolicLink()) continue;
+      const match = entry.name.match(INSTALLER_NAME);
+      if (!match || match[1] !== version) continue;
+      const platform = ['win','windows'].includes(match[2]) ? 'windows' : ['mac','darwin'].includes(match[2]) ? 'mac' : 'linux';
+      const format = ({windows:'exe',mac:'pkg',linux:'deb'})[platform];
+      if (match[4] !== format) throw Error(`Installer format does not match its platform: ${entry.name}`);
+      let receiptInfo;
+      try { receiptInfo = await lstat(`${file}.build.json`); }
+      catch (error) { if (error.code === 'ENOENT') continue; throw error; }
+      if (!receiptInfo.isFile() || receiptInfo.isSymbolicLink() || receiptInfo.size > 16384) throw Error(`Invalid build receipt: ${entry.name}`);
+      let receipt;
+      try { receipt = JSON.parse(await readFile(`${file}.build.json`,'utf8')); }
+      catch { throw Error(`Unreadable build receipt: ${entry.name}`); }
+      if (receipt?.status !== 'build-completed' || receipt.version !== version || receipt.filename !== entry.name || receipt.platform !== platform || receipt.kind !== 'installer' || !/^[a-f0-9]{64}$/.test(receipt.sha256 || '')) throw Error(`Build receipt does not match this installer: ${entry.name}`);
+      if (names.has(entry.name)) throw Error(`Duplicate installer filename: ${entry.name}`);
+      const resolved = await realpath(file);
+      if (!resolved.startsWith(canonicalRoot + path.sep)) throw Error('Installer escaped the release directory.');
+      const info = await lstat(resolved);
+      if (!info.isFile() || info.size < 1024 * 1024 || info.size !== receipt.bytes) throw Error(`Installer size differs from its completed-build receipt: ${entry.name}`);
+      const digest = await checksum(resolved);
+      if (digest !== receipt.sha256) throw Error(`Installer checksum differs from its completed-build receipt: ${entry.name}`);
+      const suffix = entry.name.match(/-([a-f0-9]{12})\.(?:exe|pkg|deb)$/)?.[1];
+      if (suffix && !digest.startsWith(suffix)) throw Error(`Installer filename does not match its checksum: ${entry.name}`);
+      await verifyPackage(resolved,format);
+      names.add(entry.name);
+      const artifact = {
+        filename: entry.name, version, platform, architecture: ({x86_64:'x64',amd64:'x64',aarch64:'arm64'})[match[3]] || match[3], format,
+        size: info.size, sha256: digest,
+        downloadUrl: baseUrl ? `${baseUrl}/${entry.name}` : `/downloads/${entry.name}`,
+        // Signing and native install testing are not established by a build receipt.
+        signing: 'unsigned', kind: 'installer', nativeInstallTested: false,
+      };
+      if (!baseUrl) artifact.relativePath = path.relative(canonicalRoot,resolved).split(path.sep).join('/');
+      artifacts.push(artifact);
     }
-    if (!receiptStat.isFile() || receiptStat.isSymbolicLink() || receiptStat.size > 16384) throw new Error(`Invalid build receipt: ${entry.name}`);
-    let receipt;
-    try { receipt = JSON.parse(await readFile(`${file}.build.json`, 'utf8')); }
-    catch { throw new Error(`Unreadable build receipt: ${entry.name}`); }
-    const platform = ['win', 'windows'].includes(match[2]) ? 'windows' : ['mac', 'darwin'].includes(match[2]) ? 'mac' : 'linux';
-    if (receipt?.status !== 'build-completed' || receipt.version !== packageInfo.version || receipt.filename !== entry.name || receipt.platform !== platform || !/^[a-f0-9]{64}$/.test(receipt.sha256 || '')) {
-      throw new Error(`Build receipt does not match this package: ${entry.name}`);
-    }
-    if (names.has(entry.name)) throw new Error(`Duplicate release filename: ${entry.name}`);
-    const resolved = await realpath(file);
-    if (!resolved.startsWith(`${await realpath(releaseRoot)}${path.sep}`)) throw new Error('Release escaped the release directory.');
-    const stat = await lstat(resolved);
-    if (!stat.size) throw new Error(`Empty release artifact: ${entry.name}`);
-    const digest = await checksum(resolved);
-    if (digest !== receipt.sha256) throw new Error(`Package checksum differs from its completed-build receipt: ${entry.name}`);
-    await verifyPackage(resolved, match[4], stat.size);
-    names.add(entry.name);
-    artifacts.push({
-      filename: entry.name,
-      version: match[1],
-      platform,
-      architecture: ({x86_64:'x64',amd64:'x64',aarch64:'arm64'})[match[3]] || match[3],
-      format: match[4].toLowerCase(),
-      size: stat.size,
-      sha256: digest,
-      downloadUrl: `/downloads/${encodeURIComponent(entry.name)}`,
-      signing: 'unsigned',
-      kind: receipt.kind || (entry.name.includes('-portable.') ? 'portable' : 'installer'),
-      relativePath: path.relative(releaseRoot, resolved).split(path.sep).join('/'),
-    });
   }
+  await scan(canonicalRoot);
+  artifacts.sort((a,b)=>`${a.platform}-${a.architecture}`.localeCompare(`${b.platform}-${b.architecture}`));
+  return { version, generatedAt: new Date().toISOString(), artifacts };
 }
 
-await scan(releaseRoot);
-artifacts.sort((a,b) => `${a.platform}-${a.architecture}-${a.format}`.localeCompare(`${b.platform}-${b.architecture}-${b.format}`));
-const manifest = { version: packageInfo.version, generatedAt: new Date().toISOString(), artifacts };
-await writeFile(path.join(root, 'public', 'downloads.json'), `${JSON.stringify(manifest, null, 2)}\n`);
-console.log(`Release manifest: ${artifacts.length} real installer artifact(s) for ${packageInfo.version}.`);
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const options = {};
+  let output = path.join(root,'public','downloads.json');
+  for (let index=2;index<process.argv.length;index+=2) {
+    const flag=process.argv[index], value=process.argv[index+1];
+    if (!value || !['--directory','--output','--base-url'].includes(flag)) throw Error('Use --directory DIR --output FILE --base-url URL.');
+    if (flag === '--directory') options.directory = path.resolve(value);
+    if (flag === '--output') output = path.resolve(value);
+    if (flag === '--base-url') options.baseUrl = value;
+  }
+  const manifest = await buildReleaseManifest(options);
+  await writeFile(output,`${JSON.stringify(manifest,null,2)}\n`);
+  console.log(`Installer catalog: ${manifest.artifacts.length} completed installer(s) for ${manifest.version}.`);
+}

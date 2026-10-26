@@ -14,7 +14,7 @@ test('first release labeling and guided setup never confuse missing runtime with
   await page.getByRole('button',{name:'Open guided setup',exact:true}).click();
   const dialog=page.getByRole('dialog');await expect(dialog.getByRole('heading',{name:'Let’s bring Mother to life.'})).toBeVisible();
   await dialog.getByRole('button',{name:'Get started',exact:false}).click();
-  await expect(dialog.getByText('Ollama is not connected yet',{exact:true})).toBeVisible();
+  await expect(dialog.getByText('Local engine is not connected yet',{exact:true})).toBeVisible();
   await expect(dialog.getByRole('button',{name:'Choose a model',exact:false})).toBeDisabled();
   await page.screenshot({path:'test-results/first-release-wizard.png'});
   await dialog.getByRole('button',{name:'Continue with offline guide',exact:true}).click();
@@ -67,13 +67,35 @@ test('coding studio writes only after approval and can restore the original',asy
   }finally{await rm(directory,{recursive:true,force:true});}
 });
 
-test('download center presents only existing artifacts and phone install requirements',async({page})=>{
+test('download center keeps unfinished builds pending and explains phone installation',async({page})=>{
+  await page.route('**/api/distribution',route=>route.fulfill({json:{version:'1.0.0-preview.1',status:'pending',artifacts:[]}}));
   await page.goto('/');await page.getByRole('button',{name:'Get Mother',exact:true}).click();
   await page.getByLabel('Your device',{exact:true}).selectOption('mac');
-  await expect(page.getByRole('link',{name:'Desktop test downloads',exact:true})).toHaveAttribute('href','https://github.com/Darius-Lea/Mother-AI/actions/workflows/desktop-installers.yml');
+  await expect(page.getByRole('heading',{name:'Your installer is being prepared.',exact:true})).toBeVisible();
+  await expect(page.locator('a[href*="/actions/"]')).toHaveCount(0);
   await page.getByLabel('Your device',{exact:true}).selectOption('mobile');
   await expect(page.getByRole('heading',{name:'Install on a phone or tablet',exact:false})).toBeVisible();
   await expect(page.getByText('This web address can be added to your home screen when served over HTTPS.',{exact:false})).toBeVisible();
+});
+
+test('desktop download opens the installer directly without a ZIP or build-page detour',async({page})=>{
+  const version='1.0.0-preview.1';
+  const entry=(platform,architecture,format)=>{
+    const filename=`Mother-AI-${version}-${platform==='windows'?'win':platform}-${architecture}.${format}`;
+    return {filename,version,platform,architecture,format,kind:'installer',size:1024*1024,sha256:'a'.repeat(64),signing:'unsigned',nativeInstallTested:false,downloadUrl:`https://github.com/Darius-Lea/Mother-AI/releases/download/mother-preview/${filename}`};
+  };
+  await page.route('**/api/distribution',route=>route.fulfill({json:{version,status:'available',artifacts:[entry('windows','x64','exe'),entry('mac','arm64','pkg'),{...entry('windows','arm64','exe'),downloadUrl:'https://evil.example/mother.exe'}]}}));
+  await page.goto('/');await page.getByRole('button',{name:'Get Mother',exact:true}).click();
+  await page.getByLabel('Your device',{exact:true}).selectOption('windows');
+  await page.getByLabel('Computer type',{exact:true}).selectOption('x64');
+  await expect(page.getByRole('link',{name:'Download Mother for Windows',exact:true})).toHaveAttribute('href',entry('windows','x64','exe').downloadUrl);
+  await expect(page.locator('.download-panel')).not.toContainText(/unzip|terminal|Sign in to GitHub/i);
+  await expect(page.locator('a[href*="/actions/"]')).toHaveCount(0);
+  await page.getByLabel('Computer type',{exact:true}).selectOption('arm64');
+  await expect(page.getByRole('heading',{name:'Your installer is being prepared.',exact:true})).toBeVisible();
+  await expect(page.locator('a[href*="evil.example"]')).toHaveCount(0);
+  await page.getByLabel('Your device',{exact:true}).selectOption('mac');
+  await expect(page.getByRole('link',{name:'Download Mother for Mac',exact:true})).toHaveAttribute('href',entry('mac','arm64','pkg').downloadUrl);
 });
 
 test('security bridge reports actual tool inventory and never invents a Kali installation',async({page})=>{

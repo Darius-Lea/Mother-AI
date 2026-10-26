@@ -6,7 +6,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('motherDesktop', Object.freeze({
   isDesktop: true,
   getSystemInfo: () => ipcRenderer.invoke('mother:system-info'),
-  openOllamaDownload: () => ipcRenderer.invoke('mother:ollama-download'),
+  getRuntimeStatus: () => ipcRenderer.invoke('mother:runtime-status'),
+  startRuntime: () => ipcRenderer.invoke('mother:runtime-start'),
   openHelp: () => ipcRenderer.invoke('mother:help'),
   chooseProjectDirectory: () => ipcRenderer.invoke('mother:choose-project-directory'),
 }));

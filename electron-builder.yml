@@ -8,6 +8,9 @@ afterAllArtifactBuild: desktop/after-build.cjs
 artifactName: Mother-AI-${version}-${os}-${arch}.${ext}
 directories:
   output: releases/desktop
+extraResources:
+  - from: .runtime/ollama
+    to: runtime
 files:
   - desktop/**
   - server/**
@@ -30,7 +33,7 @@ win:
   icon: desktop/icons/mother.ico
   signAndEditExecutable: false
 nsis:
-  oneClick: false
+  oneClick: true
   perMachine: false
   allowElevation: false
   allowToChangeInstallationDirectory: false
@@ -41,11 +44,13 @@ nsis:
   uninstallDisplayName: Mother AI
 mac:
   target:
-    - target: dmg
+    - target: pkg
       arch: [x64, arm64]
   category: public.app-category.productivity
   icon: public/icons/mother-512.png
   identity: null
+pkg:
+  installLocation: /Applications
 linux:
   target:
     - target: AppImage

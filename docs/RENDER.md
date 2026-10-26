@@ -22,7 +22,7 @@ For an existing service retaining the original settings, two compatibility steps
 - Live responsive 3D particle interface and mobile installable web shell.
 - Clearly labeled offline guide, local conversation memory, exports/imports and feedback.
 - Browser-local dataset-file review, file fingerprints, and code pattern checks.
-- Links to actual GitHub Actions desktop test downloads. A Render checkout does not contain the ignored desktop installer binaries.
+- Direct installer downloads from the approved GitHub preview channel, discovered through its verified catalog. No GitHub login, ZIP extraction, or source-code page is required. A Render checkout does not contain desktop installer binaries.
 
 The public preview does not operate the web host's filesystem, install models, create app grants, execute security tools, or inspect arbitrary URLs. Those APIs return an explicit denial before contacting local services. Public health metadata describes these capabilities so the interface can show the appropriate controls. Desktop mode keeps the protected local capabilities.
 

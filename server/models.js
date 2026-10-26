@@ -62,7 +62,7 @@ export function createModelRouter({ fetchImpl = fetch, getHardware = () => hardw
   async function status() {
     const hardware = getHardware();
     let models = [], version;
-    let runtime = { available: false, error: 'Mother could not find the local AI runtime. Install Ollama, then check again.' };
+    let runtime = { available: false, error: 'Mother could not reach the local AI engine. Open guided setup in the desktop app and try again.' };
     try {
       models = await getInstalled();
       runtime = { available: true };
@@ -156,7 +156,7 @@ export function createModelRouter({ fetchImpl = fetch, getHardware = () => hardw
     if ((Number(getHardware().totalMemoryGiB) || 0) < recommendation.minRamGiB) return res.status(422).json({ error: `This starter requires at least ${recommendation.minRamGiB} GB of system memory. Choose a smaller model.` });
     let installed;
     try { installed = await getInstalled(); }
-    catch { return res.status(503).json({ error: 'The local AI runtime is unavailable. Install or start Ollama, then check again.' }); }
+    catch { return res.status(503).json({ error: 'The local AI engine is unavailable. Open guided setup in the desktop app and try again.' }); }
     if (activeTask && ['queued', 'downloading', 'verifying'].includes(activeTask.state)) return res.status(409).json({ error: 'A model download is already in progress.', activeDownload: publicTask(activeTask) });
     if (installed.some(item => item.name === model)) return res.status(409).json({ error: 'This model is already installed. Select it instead of downloading it again.', installed: true, model });
     const task = {

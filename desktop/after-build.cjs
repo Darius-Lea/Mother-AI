@@ -7,11 +7,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const asar = require('@electron/asar');
+const { verifyBundle } = require('./runtime.cjs');
 
 function validateArchive(archive, projectRoot) {
   const entries = asar.listPackage(archive).map(name => name.replaceAll('\\', '/'));
   let checked = 0;
-  for (const name of entries.filter(entry => /^\/server\/.*\.js$/.test(entry) || /^\/desktop\/(main|preload|security)\.cjs$/.test(entry))) {
+  for (const name of entries.filter(entry => /^\/server\/.*\.js$/.test(entry) || /^\/desktop\/[^/]+\.cjs$/.test(entry))) {
     const relative = name.slice(1);
     // ASAR's lookup uses the host path separator internally. Keep listing
     // comparisons portable, but convert member names back to native paths.
@@ -35,17 +36,27 @@ function validateArchive(archive, projectRoot) {
 module.exports = async context => {
   const projectRoot = path.resolve(__dirname, '..');
   const output = path.resolve(projectRoot, 'releases', 'desktop');
-  const platforms = new Set(context.artifactPaths.map(file => /\.exe$/.test(file) ? 'win' : /\.(AppImage|deb)$/.test(file) ? 'linux' : /\.dmg$/.test(file) ? 'mac' : null));
+  const platforms = new Set(context.artifactPaths.map(file => /\.exe$/.test(file) ? 'win' : /\.(AppImage|deb)$/.test(file) ? 'linux' : /\.(dmg|pkg)$/.test(file) ? 'mac' : null));
   const archives = [];
   if (platforms.has('linux')) archives.push(path.join(output, 'linux-unpacked', 'resources', 'app.asar'));
-  if (platforms.has('win')) archives.push(path.join(output, 'win-unpacked', 'resources', 'app.asar'));
+  if (platforms.has('win')) {
+    for (const entry of fs.readdirSync(output, { withFileTypes: true }).filter(entry => entry.isDirectory() && /^win(?:-[a-z0-9]+)?-unpacked$/.test(entry.name))) archives.push(path.join(output, entry.name, 'resources', 'app.asar'));
+  }
   if (platforms.has('mac')) {
     for (const entry of fs.readdirSync(output, { withFileTypes: true }).filter(entry => entry.isDirectory() && /^mac(?:-|$)/.test(entry.name))) {
       for (const app of fs.readdirSync(path.join(output, entry.name), { withFileTypes: true }).filter(item => item.isDirectory() && item.name.endsWith('.app'))) archives.push(path.join(output, entry.name, app.name, 'Contents', 'Resources', 'app.asar'));
     }
   }
   if (!archives.length) throw new Error('No packaged application archive was found for the completed installers.');
-  for (const archive of archives) validateArchive(archive, projectRoot);
+  for (const archive of archives) {
+    validateArchive(archive, projectRoot);
+    const target = path.relative(output, archive).split(path.sep)[0];
+    await verifyBundle({
+      resourcesPath: path.dirname(archive),
+      platform: target.startsWith('win') ? 'win32' : target.startsWith('mac') ? 'darwin' : 'linux',
+      arch: target.includes('arm64') ? 'arm64' : 'x64',
+    });
+  }
   await verifyArtifacts(context.artifactPaths, require('../package.json').version);
   return [];
 };

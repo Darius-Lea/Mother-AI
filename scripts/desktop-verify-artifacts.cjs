@@ -7,7 +7,7 @@ async function verifyArtifacts(artifacts, version) {
   const written = [];
   for (const filename of artifacts) {
     const name = path.basename(filename);
-    const platform = name.endsWith('.exe') ? 'windows' : name.endsWith('.dmg') ? 'mac' : /\.(AppImage|deb)$/.test(name) ? 'linux' : null;
+    const platform = name.endsWith('.exe') ? 'windows' : /\.(dmg|pkg)$/.test(name) ? 'mac' : /\.(AppImage|deb)$/.test(name) ? 'linux' : null;
     if (!platform) continue;
     if (!name.includes(version)) throw new Error(`Installer version does not match this completed build: ${name}`);
     const stat = await fs.promises.stat(filename);

@@ -4,7 +4,7 @@ import {createApp} from '../server/index.js';
 
 let app,server,base;
 test.beforeAll(async()=>{
-  app=createApp({mode:'hosted-preview'});server=app.listen(0,'127.0.0.1');
+  app=createApp({mode:'hosted-preview',distributionFetchImpl:async()=>new Response('',{status:404})});server=app.listen(0,'127.0.0.1');
   await new Promise(resolve=>server.once('listening',resolve));base=`http://127.0.0.1:${server.address().port}`;
 });
 test.afterAll(async()=>{app.locals.shutdown();await new Promise(resolve=>{server.close(resolve);server.closeAllConnections();});});
@@ -38,7 +38,8 @@ test('hosted preview works on phones while keeping server controls private',asyn
   await page.getByRole('tab',{name:'Code review',exact:true}).click();await page.getByRole('textbox',{name:'Source code',exact:true}).fill('eval(userInput);');
   await page.getByRole('button',{name:'Review patterns',exact:true}).click();await expect(page.getByText('Dynamic code evaluation',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Get Mother',exact:true}).click();
-  await expect(page.getByRole('link',{name:'Desktop test downloads',exact:true})).toHaveAttribute('href','https://github.com/Darius-Lea/Mother-AI/actions/workflows/desktop-installers.yml');
+  await expect(page.getByRole('heading',{name:'Your installer is being prepared.',exact:true})).toBeVisible();
+  await expect(page.locator('a[href*="/actions/"]')).toHaveCount(0);
   await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await page.screenshot({path:'test-results/render-phone-preview.png',fullPage:true});
   expect(privateRequests).toEqual([]);expect(errors).toEqual([]);

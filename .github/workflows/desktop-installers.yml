@@ -1,7 +1,7 @@
 name: Build Mother desktop installers
 
-# This workflow builds reviewable artifacts. It never publishes a release,
-# uploads signing credentials, or executes arbitrary user-supplied scripts.
+# Every main update produces reviewable native builds. Only the final job can
+# publish installer files, and only to the explicitly marked preview channel.
 on:
   workflow_dispatch:
   push:
@@ -12,11 +12,16 @@ permissions:
 
 jobs:
   desktop:
-    name: ${{ matrix.os }} installer
+    name: ${{ matrix.platform }} ${{ matrix.arch }} installer
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        include:
+          - { os: windows-latest, platform: win32, arch: x64 }
+          - { os: windows-latest, platform: win32, arch: arm64 }
+          - { os: macos-latest, platform: darwin, arch: x64 }
+          - { os: macos-latest, platform: darwin, arch: arm64 }
+          - { os: ubuntu-latest, platform: linux, arch: x64 }
     runs-on: ${{ matrix.os }}
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
@@ -26,13 +31,23 @@ jobs:
         with:
           node-version: '24'
           cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - run: npm ci
       - run: npm test
+      - name: Cache verified neural runtime
+        uses: actions/cache@v4
+        with:
+          path: .runtime/ollama
+          key: ollama-0.40.11-${{ matrix.platform }}-${{ matrix.arch }}-${{ hashFiles('scripts/prepare-runtime.py') }}
+      - name: Prepare bundled neural runtime
+        run: python scripts/prepare-runtime.py --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}
       - name: Build native installers
         shell: bash
         run: |
           set -o pipefail
-          npm run desktop:dist -- --publish never 2>&1 | tee desktop-build.log
+          npm run desktop:dist -- --${{ matrix.arch }} --publish never 2>&1 | tee desktop-build.log
       - name: Record installer failure details
         if: failure()
         shell: bash
@@ -46,18 +61,47 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: Mother-AI-${{ runner.os }}-build-diagnostics
+          name: Mother-AI-${{ matrix.platform }}-${{ matrix.arch }}-build-diagnostics
           path: desktop-build.log
           if-no-files-found: ignore
           retention-days: 14
-      - uses: actions/upload-artifact@v4
+      - name: Save completed installers for publication
+        uses: actions/upload-artifact@v4
         with:
-          name: Mother-AI-${{ runner.os }}-installers
+          name: Mother-AI-${{ matrix.platform }}-${{ matrix.arch }}-installers
           path: |
             releases/desktop/*.exe
-            releases/desktop/*.dmg
-            releases/desktop/*.AppImage
+            releases/desktop/*.pkg
             releases/desktop/*.deb
             releases/desktop/*.build.json
           if-no-files-found: error
           retention-days: 14
+
+  publish-preview:
+    name: Publish direct preview downloads
+    needs: desktop
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # Serialize publication; the script also verifies main before publishing
+    # the catalog so an older completed build cannot replace a newer preview.
+    concurrency:
+      group: mother-preview-downloads
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: Mother-AI-*-installers
+          path: preview-artifacts
+          merge-multiple: true
+      - name: Verify installer catalog
+        run: node scripts/release-manifest.js --directory preview-artifacts --output preview-artifacts/downloads.json --base-url https://github.com/Darius-Lea/Mother-AI/releases/download/mother-preview
+      - name: Publish installers and catalog
+        run: node scripts/publish-preview.mjs --directory preview-artifacts
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -17,9 +17,9 @@ The final step confirms installation, not the quality, speed, or correctness of 
 
 ## Runtime installation
 
-On supported Windows and macOS desktops, **Get the free runtime** opens the official Ollama download page in the normal browser. Complete its normal operating-system installer and open Ollama, then return to Mother and choose **Check again**. Mother does not covertly install executables, bypass system approval, or claim that opening a page completed installation.
+Supported desktop installers include a verified official Ollama engine. Mother starts it automatically on this computer, or reuses a compatible local service already running. The wizard can retry a failed startup without opening a separate installer or terminal.
 
-On Linux, Ollama's official runtime installation may require a system administrator or the official installation steps. This release does not implement an unattended Linux runtime installer. The Mother desktop package itself bundles the application's own Node/Electron runtime; Ollama and its model are separate.
+Windows x64/arm64, Mac Intel/Apple Silicon, and Linux x64 builds include the engine and required local libraries. Models download separately after consent and are saved under Mother's app-data directory. Build preparation verifies official release checksums and retains upstream notices; startup verifies the retained file manifest. See [automatic runtime](AUTOMATIC-RUNTIME.md).
 
 A phone or tablet viewing Mother is a client of the server host. The status page describes that host's hardware, not the phone. Installing Ollama on a different device will not automatically make it available to Mother's server. The mobile web app does not bundle a native Ollama runtime; connect it to a properly secured compatible host for neural inference.
 

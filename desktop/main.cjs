@@ -12,7 +12,8 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
-const { APP_ORIGIN, CSP, isAppUrl, isAllowedExternalUrl, officialDownloadUrl } = require('./security.cjs');
+const { APP_ORIGIN, CSP, isAppUrl, isAllowedExternalUrl } = require('./security.cjs');
+const { createRuntimeManager } = require('./runtime.cjs');
 
 // A stable secure origin preserves localStorage across random server ports and
 // app upgrades. Remote webpages never receive access to this protocol handler.
@@ -30,6 +31,7 @@ let mainWindow;
 let localServer;
 let backendConnection;
 let backendApp;
+let runtimeManager;
 let protocolRegistered = false;
 let quitting = false;
 
@@ -56,21 +58,31 @@ async function openOfficial(value) {
   return { ok: true, opened: value };
 }
 
+async function showHelp() {
+  await dialog.showMessageBox(mainWindow, {
+    type: 'info', title: 'Welcome to Mother', message: 'Your companion, on this computer.',
+    detail: 'Use Connections → Open guided setup to choose a free local model. Mother includes the local AI engine and handles model downloads. No API key or terminal is required.\n\nUse Knowledge to review references, Coding studio to choose a project, and App permissions to connect compatible applications. These preview tools require your approval before accessing your projects or granting an app access.',
+  });
+  return { ok: true };
+}
+
 function registerNativeActions() {
   ipcMain.handle('mother:system-info', event => {
     ensureTrustedSender(event);
     const memoryGiB = Math.round(os.totalmem() / (1024 ** 3));
     return { platform: process.platform, arch: process.arch, totalMemoryGiB: memoryGiB, memoryGB: memoryGiB, appVersion: app.getVersion(), desktop: true };
   });
-  ipcMain.handle('mother:ollama-download', async event => {
+  ipcMain.handle('mother:runtime-status', event => {
     ensureTrustedSender(event);
-    // The user completes the official, visible OS installation. We do not run
-    // downloaded executables, silently install services, or bypass OS approval.
-    return openOfficial(officialDownloadUrl(process.platform));
+    return runtimeManager.status();
+  });
+  ipcMain.handle('mother:runtime-start', async event => {
+    ensureTrustedSender(event);
+    return runtimeManager.ensureStarted();
   });
   ipcMain.handle('mother:help', async event => {
     ensureTrustedSender(event);
-    return openOfficial('https://github.com/Darius-Lea/Mother-AI');
+    return showHelp();
   });
   ipcMain.handle('mother:choose-project-directory', async event => {
     ensureTrustedSender(event);
@@ -190,11 +202,19 @@ if (!singleInstance) {
     if (mainWindow) { if (mainWindow.isMinimized()) mainWindow.restore(); mainWindow.focus(); }
   });
   app.whenReady().then(async () => {
+    runtimeManager = createRuntimeManager({
+      resourcesPath: process.resourcesPath,
+      userData: app.getPath('userData'),
+      ...(!app.isPackaged ? { bundleDirectory: path.join(app.getAppPath(), '.runtime', 'ollama') } : {}),
+    });
+    // The trusted desktop session can retry through a narrow IPC action.
+    // Starting the bundled engine never blocks the visual companion from opening.
+    void runtimeManager.ensureStarted().catch(() => log('Local AI engine could not start. Guided setup can retry.'));
     const template = [
       ...(process.platform === 'darwin' ? [{ role: 'appMenu' }] : []),
       { label: 'Edit', submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }] },
       { label: 'View', submenu: [{ role: 'reload' }, { role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' }, { role: 'togglefullscreen' }] },
-      { label: 'Help', submenu: [{ label: 'Mother help', click: () => { void openOfficial('https://github.com/Darius-Lea/Mother-AI'); } }] },
+      { label: 'Help', submenu: [{ label: 'Mother help', click: () => { void showHelp(); } }] },
     ];
     Menu.setApplicationMenu(Menu.buildFromTemplate(template));
     registerNativeActions();
@@ -211,6 +231,7 @@ if (!singleInstance) {
   app.on('before-quit', () => {
     quitting = true;
     backendApp?.locals.shutdown?.();
+    runtimeManager?.stop();
     localServer?.close();
     localServer?.closeAllConnections?.();
   });

@@ -1,23 +1,23 @@
 # Mother AI — First release preview
 
-**1.0.0-preview.1 · Unpublished · Not yet market ready**
+**1.0.0-preview.1 · Preview downloads · Not yet market ready**
 
 Mother is a free, local-first assistant workspace with a live blue-and-gold 3D particle character. This is the preview of the first planned release. No public product release has been published.
 
 ## Try the desktop app
 
-Successful **Build Mother desktop installers** runs in this repository's GitHub Actions produce test-download artifacts. Download the artifact for your operating system and open its installer. Builds need to complete before downloads exist; the workflow does not publish a GitHub release.
+Open **Get Mother** on the website and select **Download Mother**. The page detects your operating system and offers the direct installer when its verified build has finished. GitHub hosts these files in the explicitly marked `mother-preview` prerelease channel. No ZIP extraction, GitHub sign-in, source folders, or terminal commands are part of this download flow.
 
-- **Windows:** open the setup `.exe`, follow the wizard, then launch Mother from its shortcut.
-- **Mac:** open the `.dmg` and drag Mother into Applications. A Mac build must run on the native macOS builder.
-- **Linux:** use the `.deb` package installer or the compatible AppImage.
+- **Windows:** open the setup `.exe` and approve normal operating-system prompts. The per-user installer adds shortcuts and opens Mother.
+- **Mac:** open the `.pkg` and complete the normal installer, then open Mother from Applications or Launchpad. Intel and Apple Silicon downloads are separate.
+- **Linux:** open the `.deb` in the normal Debian/Ubuntu package installer.
 - **Phone or tablet:** use the responsive installable web app after a secure, reachable HTTPS deployment. Native Android/iPhone packages and public mobile hosting are not supplied yet.
 
-Desktop packages include the application runtime. Ordinary users do not need Node, a terminal, or source folders. Packages remain unsigned previews, so target-device testing and trusted signing/notarization are still required for a public production release. See [desktop installation](docs/DESKTOP.md) and [mobile compatibility](docs/MOBILE.md).
+Desktop packages include Node, Electron, and the local Ollama AI engine. Packages remain unsigned previews, so target-device testing and trusted signing/notarization are still required for a public production release. See [desktop installation](docs/DESKTOP.md) and [mobile compatibility](docs/MOBILE.md).
 
 ## Set up Mother's intelligence
 
-The first-run wizard checks the computer, detects Ollama, and recommends free local models suited to its RAM. If Ollama is missing, the wizard opens its official download page. Complete the operating system's normal installer and return to Mother; she detects the service and can download your chosen model with progress and cancellation.
+Mother starts her included local AI engine automatically, or reuses a compatible engine already running on the computer. The first-run wizard recommends free models suited to the computer's RAM and downloads your chosen model with actual progress and cancellation. No separate Ollama installer is needed.
 
 No paid API key is required. Larger models use more storage and memory and can be slow on CPU. Their names do not establish equivalence with ChatGPT, Codex, or Claude. The local model generates neural answers only when it is installed and running. Until then Mother explicitly uses a small **Offline guide**; that guide is not neural AI.
 
@@ -61,11 +61,14 @@ The local API binds to `127.0.0.1:3001`; Vite proxies API requests during develo
 ```sh
 npm test
 npm run test:e2e
+python3 scripts/prepare-runtime.py --platform linux --arch x64
 npm run desktop
-npm run desktop:dist -- --publish never
+npm run desktop:dist -- --x64 --publish never
 ```
 
 Browser tests use Chromium at `/usr/bin/chromium` or `CHROMIUM_PATH`. They test actual WebGL and user workflows; mocked model integration tests do not prove a real model is installed. The desktop smoke test in `scripts/desktop-smoke.mjs` checks isolation, API authentication, and memory across restarts.
+
+The runtime-preparation command above is a Linux x64 developer example; use `win32` or `darwin` and the matching architecture for other build targets. Render builds only the web preview and does not download this desktop engine.
 
 The optional `npm run package:portable` creates a **developer source archive**, not a consumer installer. Compatible desktops still need their own model files. Packaged ASAR resources keep implementation files outside the normal user experience, but cannot prevent a device owner from inspecting software. Never embed credentials in distributed client code.
 
