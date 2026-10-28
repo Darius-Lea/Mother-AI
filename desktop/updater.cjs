@@ -67,7 +67,9 @@ function createUpdateManager({userData,platform=process.platform,arch=process.ar
     throw Error('Too many update redirects.');
   }
   async function readCatalog(signal) {
-    const response=await request(CATALOG,signal), chunks=[];
+    const fresh=new URL(CATALOG);
+    fresh.searchParams.set('mother_check',randomBytes(8).toString('hex'));
+    const response=await request(fresh.href,signal), chunks=[];
     let size=0;
     if(Number(response.headers.get('content-length'))>256*1024){await response.body?.cancel();throw Error('Invalid update catalog.');}
     if(!response.body)throw Error('Empty update catalog.');

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import packageInfo from '../package.json' with { type: 'json' };
 import { normalizeInstaller, PREVIEW_MANIFEST_URL } from './downloads-validation.js';
 import {fetchOfficialAsset} from './https-assets.js';
+import {randomBytes} from 'node:crypto';
 
 const MAX_CATALOG_BYTES = 64 * 1024;
 const allowedRedirectHosts = new Set(['github.com', 'release-assets.githubusercontent.com']);
@@ -21,7 +22,11 @@ function validCatalog(value, remoteOnly) {
 }
 
 async function readRemote(fetchImpl, signal) {
-  let url = PREVIEW_MANIFEST_URL;
+  // The rolling catalog changes while installer filenames stay immutable.
+  // Avoid a CDN's cached redirect to the previous catalog after publication.
+  const fresh=new URL(PREVIEW_MANIFEST_URL);
+  fresh.searchParams.set('mother_check',randomBytes(8).toString('hex'));
+  let url = fresh.href;
   for (let redirect = 0; redirect <= 3; redirect++) {
     const response = await fetchImpl(url, { signal, redirect: 'manual', headers: { Accept: 'application/json' } });
     if ([301,302,303,307,308].includes(response.status)) {

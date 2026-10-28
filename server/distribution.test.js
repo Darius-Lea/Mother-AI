@@ -46,7 +46,7 @@ test('remote catalog follows only approved asset redirects and shares a bounded 
   let calls=0;
   const {catalog}=await fixture(t,{fetchImpl:async(url,options)=>{
     calls++;assert.equal(options.redirect,'manual');assert.ok(options.signal);
-    if(url===PREVIEW_MANIFEST_URL)return new Response(null,{status:302,headers:{location:'https://release-assets.githubusercontent.com/github-production-release-asset/manifest?token=example'}});
+    if(new URL(url).origin+new URL(url).pathname===PREVIEW_MANIFEST_URL)return new Response(null,{status:302,headers:{location:'https://release-assets.githubusercontent.com/github-production-release-asset/manifest?token=example'}});
     assert.match(url,/^https:\/\/release-assets\.githubusercontent\.com\//);
     return Response.json({...manifest,secretPath:'/private/data',artifacts:[{...installer,relativePath:'../private'}]});
   }});
@@ -56,6 +56,18 @@ test('remote catalog follows only approved asset redirects and shares a bounded 
   assert.equal(one.artifacts[0].relativePath,undefined);assert.equal(one.secretPath,undefined);
   await catalog.catalog();assert.equal(calls,2);
   assert.equal(await catalog.localFile(filename),null);
+});
+test('each catalog refresh bypasses cached rolling-release redirects without changing the trusted path',async t=>{
+  const requests=[];
+  const {catalog}=await fixture(t,{cacheMs:0,fetchImpl:async value=>{
+    const url=new URL(value);requests.push(url);
+    assert.equal(url.origin+url.pathname,PREVIEW_MANIFEST_URL);
+    assert.match(url.searchParams.get('mother_check'),/^[a-f0-9]{16}$/);
+    return Response.json(manifest);
+  }});
+  assert.equal((await catalog.catalog()).status,'available');
+  assert.equal((await catalog.catalog()).status,'available');
+  assert.equal(requests.length,2);assert.notEqual(requests[0].search,requests[1].search);
 });
 
 test('unsafe redirects, oversized catalogs and malformed installers never become download links',async t=>{
