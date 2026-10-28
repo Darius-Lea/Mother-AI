@@ -14,6 +14,8 @@ import {deploymentConfig,publicCapabilities} from './deployment.js';
 import {createDistributionCatalog} from './distribution.js';
 import {createWebRouter} from './web.js';
 import {createVoiceRouter} from './voice.js';
+import {BUILD_INFO} from './build-info.js';
+import {createRecognitionRouter} from './recognition.js';
 
 /** The browser may not access the local brain through an attacker-owned DNS name. */
 export function isAllowedHostHeader(header, allowedHosts = []) {
@@ -70,7 +72,7 @@ export function createApp({ fetchImpl = fetch, distributionFetchImpl, webOptions
     next();
   });
   app.use('/api',(req,res,next)=>{
-    const voiceAsset=['GET','HEAD'].includes(req.method) && (req.path==='/voice/status'||req.path.startsWith('/voice/files/'));
+    const voiceAsset=['GET','HEAD'].includes(req.method) && (req.path==='/voice/status'||req.path.startsWith('/voice/files/')||['/recognition/status','/recognition/model.tar.gz'].includes(req.path));
     if(hostedPreview&&!voiceAsset&&!['/health','/models','/distribution'].includes(req.path)){
       return res.status(403).json({error:'This web preview keeps computer controls private. Download Mother for local AI setup, projects, app permissions, and host security tools.',mode:'hosted-preview'});
     }
@@ -79,9 +81,25 @@ export function createApp({ fetchImpl = fetch, distributionFetchImpl, webOptions
   app.use(express.json({ limit: '1mb' }));
   app.use('/api',(req,res,next)=>{if(req.path==='/health'||req.path==='/distribution'||req.path==='/connect'||req.path.startsWith('/connect/'))return next();return requireAdmin(req,res,next);});
 
-  app.get('/api/health',(_req,res)=>res.json({ok:true,name:'Mother AI',version:'1.0.0-preview.1',releaseStatus:'first-release-preview',storage:'browser-local',paidServices:false,mode,capabilities:publicCapabilities(mode)}));
+  app.get('/api/health',(_req,res)=>{res.setHeader('Cache-Control','no-store');res.json({ok:true,name:'Mother AI',...BUILD_INFO,releaseStatus:'first-release-preview',storage:'browser-local',paidServices:false,mode,capabilities:publicCapabilities(mode)});});
   app.get('/api/models',async(_req,res)=>res.json(hostedPreview?{available:false,models:[],mode,error:'This hosted preview uses the offline guide. Local neural models run in the desktop app.'}:await brain.models()));
   app.post('/api/chat',async(req,res)=>{try{res.json(await brain.chat(req.body));}catch(error){res.status(error.status||500).json({error:error.message});}});
+  app.post('/api/chat/stream',async(req,res)=>{
+    const controller=new AbortController();
+    const cancel=()=>{if(!res.writableEnded)controller.abort();};
+    res.on('close',cancel);
+    const emit=value=>{if(!res.destroyed && !controller.signal.aborted)res.write(JSON.stringify(value)+'\n');};
+    res.setHeader('Content-Type','application/x-ndjson');
+    res.setHeader('Cache-Control','no-store');
+    res.setHeader('X-Accel-Buffering','no');
+    try {
+      const result=await brain.stream(req.body,{signal:controller.signal,onChunk:text=>emit({type:'delta',text})});
+      emit({type:'done',result});
+    }catch(error){
+      if(!res.headersSent)res.status(error.status||500);
+      emit({type:'error',error:error.message});
+    }finally{res.off('close',cancel);res.end();}
+  });
   const modelRouter=createModelRouter({fetchImpl});
   app.use('/api/setup',modelRouter);
   const integrations=createIntegrationRouters({directory:dataDirectory,requireAdmin,chat:brain.chat,models:brain.models});
@@ -94,7 +112,9 @@ export function createApp({ fetchImpl = fetch, distributionFetchImpl, webOptions
   app.use('/api/web',webRouter);
   const voiceRouter=createVoiceRouter({directory:path.join(dataDirectory,'voice'),nativeSynthesis:!hostedPreview,...voiceOptions});
   app.use('/api/voice',voiceRouter);
-  app.locals.shutdown=()=>{modelRouter.shutdown?.();securityRouter.shutdown?.();webRouter.shutdown?.();voiceRouter.shutdown?.();};
+  const recognitionRouter=createRecognitionRouter({directory:path.join(dataDirectory,'recognition')});
+  app.use('/api/recognition',recognitionRouter);
+  app.locals.shutdown=()=>{modelRouter.shutdown?.();securityRouter.shutdown?.();webRouter.shutdown?.();voiceRouter.shutdown?.();recognitionRouter.shutdown?.();};
 
   app.post('/api/datasets/inspect', async (req, res) => {
     if (typeof req.body?.url !== 'string' || req.body.url.length > 4096) return res.status(400).json({ error: 'Provide one public HTTPS dataset URL.' });

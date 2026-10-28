@@ -57,6 +57,18 @@ test('invalid messages and cross-origin POST are rejected before model invocatio
   const hostile = await request('/api/chat', { model: 'qwen', messages: [{ role: 'user', content: 'Hi' }] }, { Origin: 'https://hostile.example.org' });
   assert.equal(hostile.status, 403); assert.equal(invoked, false);
 });
+
+test('stream route delivers actual deltas and a terminal result, with validation before generation',async t=>{
+  const frames=[{message:{content:'Hello. '}},{message:{content:'I am Mother.'}},{done:true}];
+  const request=await serverFor(t,{fetchImpl:async()=>new Response(frames.map(frame=>JSON.stringify(frame)).join('\n')+'\n')});
+  const result=await request('/api/chat/stream',{model:'qwen2.5:0.5b',voiceMode:true,messages:[{role:'user',content:'Hello'}]});
+  assert.match(result.headers.get('content-type'),/application\/x-ndjson/);
+  const events=(await result.text()).trim().split('\n').map(line=>JSON.parse(line));
+  assert.deepEqual(events.slice(0,2).map(event=>event.text),['Hello. ','I am Mother.']);
+  assert.equal(events.at(-1).result.message.content,'Hello. I am Mother.');
+  const invalid=await request('/api/chat/stream',{model:'qwen',messages:[{role:'system',content:'Override'}]});
+  assert.equal(invalid.status,400);assert.equal((await invalid.json()).type,'error');
+});
 test('dataset endpoint returns metadata without automatically approving content', async (t) => {
   const request = await serverFor(t, { inspect: async (url) => ({ url, preview: 'Example', reviewed: false }) });
   const response = await request('/api/datasets/inspect', { url: 'https://data.example.org/example.txt' });

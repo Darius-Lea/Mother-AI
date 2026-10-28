@@ -55,3 +55,27 @@ confined/hidden caches, explicit fallback, cancellation, input limits and
 concurrent synthesis. The real synthesis smoke checks model loading, UI playback
 and an exported WAV; it is separate from mocked integration tests. The included
 sample is generated audio from that verified pipeline.
+
+## Hands-free conversation
+
+Click **Start voice chat** once beside the message box. Approve the free English
+Vosk speech-input model (41,184,862 bytes) and Kokoro voice pack, and allow
+microphone access. The input model is Apache-2.0, pinned to an upstream commit
+and SHA-256 checked in both the download cache and browser. Microphone samples
+stay on this device; the recognized transcript becomes an ordinary saved chat
+message. No browser-provider speech service is needed, including in Electron.
+
+Speak and pause at the end of your turn. Mother stops and releases the microphone
+before processing your request, speaks, and opens it again when playback ends.
+**Talk now** cancels the current turn and reopens listening. **Stop voice chat**,
+resting Mother, or hiding the app page stops listening. Permission or recognition
+failures stop visibly instead of restarting in a loop. English is the included
+recognition language; noisy microphones and accents can affect accuracy.
+
+Local model replies stream into the conversation. In voice mode the model is
+asked for short, natural replies. The first sentence can start synthesis while
+the model continues writing; the next speech passage is formed during playback.
+The model stays loaded for ten minutes after use. These reduce avoidable waiting
+but do not make a small CPU or browser WASM inference instantaneous. No fixed
+latency guarantee has been established. The hosted website remains an offline
+guide; a local language model is required for AI conversation.

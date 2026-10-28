@@ -92,7 +92,7 @@ test('production app shell can reopen offline after a visit',async({page,context
   await page.evaluate(()=>navigator.serviceWorker.ready);
   await page.reload();
   await expect(page.getByRole('heading',{name:'Meet Mother.'})).toBeVisible();
-  await page.waitForFunction(async()=>{const cache=await caches.open('mother-shell-v1');const requests=await cache.keys();return requests.some(r=>r.url.endsWith('/index.html')) && requests.filter(r=>r.url.includes('/assets/')).length>=3;});
+  await page.waitForFunction(async()=>{const cache=await caches.open('mother-shell-v2');const requests=await cache.keys();return requests.some(r=>r.url.endsWith('/index.html')) && requests.filter(r=>r.url.includes('/assets/')).length>=3;});
   await context.setOffline(true);
   await page.reload();
   await expect(page.getByRole('heading',{name:'Meet Mother.'})).toBeVisible();

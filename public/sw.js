@@ -1,6 +1,9 @@
 /* Only the built interface is cached. API replies and personal memory never enter this cache. */
-const CACHE = 'mother-shell-v1';
-self.addEventListener('install', event => { self.skipWaiting(); });
+const CACHE = 'mother-shell-v2';
+// A new build waits while you work. Only the explicit update button activates it.
+self.addEventListener('message', event => {
+  if (event.data?.type === 'ACTIVATE_UPDATE') self.skipWaiting();
+});
 self.addEventListener('activate', event => {
   event.waitUntil(Promise.all([self.clients.claim(), caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('mother-shell-') && key !== CACHE).map(key => caches.delete(key))))]));
 });

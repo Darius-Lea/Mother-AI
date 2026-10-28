@@ -1,6 +1,6 @@
 # Mother AI — First release preview
 
-**1.0.0-preview.1 · Preview downloads · Not yet market ready**
+**1.0.0-preview.2 · Preview downloads · Not yet market ready**
 
 Mother is a free, local-first assistant workspace with a live blue-and-gold 3D particle character. This is the preview of the first planned release. No public product release has been published.
 
@@ -75,3 +75,18 @@ The runtime-preparation command above is a Linux x64 developer example; use `win
 The optional `npm run package:portable` creates a **developer source archive**, not a consumer installer. Compatible desktops still need their own model files. Packaged ASAR resources keep implementation files outside the normal user experience, but cannot prevent a device owner from inspecting software. Never embed credentials in distributed client code.
 
 Memory is stored locally in the browser profile and readable JSON exports. It is not an encrypted vault. Neural speech is local to the browser or Mother host; basic device speech and recognition may use provider services. Websites can still log IP addresses and activity. Owner web logs stay outside model prompts. See [architecture](docs/ARCHITECTURE.md), [local API](server/README.md), and the feature status before deploying.
+
+## Voice chat and updates
+
+Click **Start voice chat** beside the message box, approve the free speech packs
+and microphone access, then speak and pause. The microphone stays enabled
+between turns and pauses while Mother speaks. **Talk now** interrupts a reply;
+**Stop voice chat** turns the microphone off. Speech recognition runs locally in
+English. The hosted website still uses the offline guide; install the desktop
+app and select a free local model for AI conversation. See [VOICE.md](docs/VOICE.md).
+
+Open **Updates** in the top bar. Desktop updates download with progress while
+you keep working; **Install update** opens the normal OS installer after you
+finish your conversation. Your models and memory remain in place. Older previews
+need one install over the existing app to gain this updater—no uninstall needed.
+See [UPDATES.md](docs/UPDATES.md).

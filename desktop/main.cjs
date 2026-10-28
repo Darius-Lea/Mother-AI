@@ -15,6 +15,7 @@ const { pathToFileURL } = require('node:url');
 const { APP_ORIGIN, CSP, isAppUrl, isAllowedExternalUrl } = require('./security.cjs');
 const { createRuntimeManager } = require('./runtime.cjs');
 const { createPrivateBrowser } = require('./browser.cjs');
+const { createUpdateManager } = require('./updater.cjs');
 
 // A stable secure origin preserves localStorage across random server ports and
 // app upgrades. Remote webpages never receive access to this protocol handler.
@@ -34,6 +35,8 @@ let backendConnection;
 let backendApp;
 let runtimeManager;
 let privateBrowser;
+let updateManager;
+let updateTimer;
 let protocolRegistered = false;
 let quitting = false;
 
@@ -70,6 +73,12 @@ async function showHelp() {
 
 function registerNativeActions() {
   const browser = () => privateBrowser ||= createPrivateBrowser({ parent: mainWindow, userData: app.getPath('userData') });
+  for (const [channel, action] of Object.entries({status:'status',check:'check',download:'download',install:'install',cancel:'cancel'})) {
+    ipcMain.handle(`mother:update-${channel}`, event => {
+      ensureTrustedSender(event);
+      return updateManager[action]();
+    });
+  }
   ipcMain.handle('mother:system-info', event => {
     ensureTrustedSender(event);
     const memoryGiB = Math.round(os.totalmem() / (1024 ** 3));
@@ -218,6 +227,19 @@ if (!singleInstance) {
     if (mainWindow) { if (mainWindow.isMinimized()) mainWindow.restore(); mainWindow.focus(); }
   });
   app.whenReady().then(async () => {
+    const {fetchOfficialAsset}=await import(pathToFileURL(path.join(app.getAppPath(),'server','https-assets.js')).href);
+    let build={};
+    try { build=JSON.parse(fs.readFileSync(path.join(app.getAppPath(),'server','build-info.json'),'utf8')); } catch {}
+    updateManager=createUpdateManager({
+      userData:app.getPath('userData'),currentVersion:app.getVersion(),currentCommit:build.buildCommit,currentBuiltAt:build.buildTime,
+      fetchImpl:fetchOfficialAsset,
+      onStatus:status=>{if(mainWindow && !mainWindow.isDestroyed())mainWindow.webContents.send('mother:update-status',status);},
+      openInstaller:async file=>{
+        const error=await shell.openPath(file);
+        if(error)throw Error('The operating system could not open the installer.');
+      },
+      onInstallStarted:()=>{setTimeout(()=>app.quit(),750);},
+    });
     runtimeManager = createRuntimeManager({
       resourcesPath: process.resourcesPath,
       userData: app.getPath('userData'),
@@ -235,6 +257,8 @@ if (!singleInstance) {
     Menu.setApplicationMenu(Menu.buildFromTemplate(template));
     registerNativeActions();
     await createWindow();
+    // Checks are read-only. Downloading and OS installation need a button click.
+    updateTimer=setInterval(()=>void updateManager.check(),30*60*1000);
   }).catch(async error => {
     log(`Application startup failed: ${error.stack || error.message}`);
     await dialog.showMessageBox({ type: 'error', title: 'Mother could not start', message: 'Mother could not start her local service.', detail: 'Please restart Mother. Your saved memory stays on this device. If the problem continues, contact the application maintainer.' });
@@ -246,6 +270,8 @@ if (!singleInstance) {
   app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
   app.on('before-quit', () => {
     quitting = true;
+    clearInterval(updateTimer);
+    updateManager?.stop();
     backendApp?.locals.shutdown?.();
     runtimeManager?.stop();
     void privateBrowser?.close();

@@ -13,7 +13,7 @@ test('desktop owner session isolates admin APIs while explicitly scoped app toke
   t.after(async()=>{app.locals.shutdown();await new Promise(resolve=>server.close(resolve));await rm(directory,{recursive:true,force:true});});
   const base=`http://127.0.0.1:${server.address().port}`;
   assert.equal((await fetch(base+'/api/health')).status,200);
-  assert.equal((await (await fetch(base+'/api/health')).json()).version,'1.0.0-preview.1');
+  assert.equal((await (await fetch(base+'/api/health')).json()).version,'1.0.0-preview.2');
   for(const route of ['/api/models','/api/setup/status','/api/integrations','/api/workspace/status','/api/security/capabilities','/api/web/status','/api/web/activity','/api/voice/status'])assert.equal((await fetch(base+route)).status,401);
   assert.equal((await fetch(base+'/api/models',{headers:{'X-Mother-Desktop-Token':'wrong'}})).status,401);
   const headers={'Content-Type':'application/json','X-Mother-Desktop-Token':desktopToken};

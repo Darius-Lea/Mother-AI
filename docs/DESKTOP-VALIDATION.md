@@ -1,6 +1,16 @@
 # Desktop preview validation
 
-These are unsigned **1.0.0-preview.1** previews, not a production release. The earlier package results below are historical; they do not describe the new bundled-engine installer.
+The current build is the unsigned **1.0.0-preview.2** first-release preview, not a production release. Older package results below are historical.
+
+## Voice chat and in-app updates
+
+- 275 Node checks passed, including microphone lifecycle, audio-thread sample integrity, streaming replies, speech cancellation, update size/SHA-256 verification, private cache handling and version checks.
+- The 20 initially passing browser workflows, two isolated timeout retries and new preparation-cancel check all passed. The two first-run timeouts occurred under concurrent software-rendering/inference load; their isolated reruns passed without relaxing the timeout.
+- Actual Chromium recognition and Kokoro playback passed through the complete application. The microphone automatically submitted one recognized turn, closed before speech, resumed afterward, and released on Stop. A deterministic streamed language-model fixture was used; this does not establish actual local-model inference speed or quality.
+- In that test, real synthesized audio began approximately 11 seconds before the fixture finished its deliberately delayed response. The first-time setup plus full two-sentence turn took approximately 42 seconds on the cloud CPU. Neither figure is an end-user latency guarantee.
+- Actual Vosk input also passed in the Electron window at `mother://app`, recognizing the test recording while the voice-chat button stayed enabled, then releasing the microphone on Stop.
+- The actual desktop updater bridge checked the fixed GitHub catalog with normal TLS. Download integrity, cancellation and installer handoff are covered by injected-fixture tests; no live installer was launched by those checks.
+- The new Linux DEB and ASAR archive were built and integrity checked. Windows/macOS installation, trusted signing and notarization remain separate checks.
 
 ## Direct-installer update
 

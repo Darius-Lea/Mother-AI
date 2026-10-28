@@ -11,3 +11,4 @@ releases/
 .mother-data/
 .cache/
 .runtime/
+server/build-info.json

@@ -70,6 +70,7 @@ export function createMotherVoice({ onStatus = () => {}, onActivity = () => {},
   let finishSystem;
   let native=false,nativeRequest;
   const waiting = new Map();
+  const speechStops = new Set();
   const getStatus = () => ({ ...status });
   const update = next => { status = { ...status, ...next }; if (!disposed) onStatus(getStatus()); };
 
@@ -115,6 +116,7 @@ export function createMotherVoice({ onStatus = () => {}, onActivity = () => {},
   }
   function stop() {
     generation++;
+    for (const cancel of speechStops) cancel();
     nativeRequest?.abort();nativeRequest=null;
     if (source) { try { source.stop(); } catch {} source = null; }
     finishPlayback?.(); finishPlayback = null;
@@ -129,6 +131,7 @@ export function createMotherVoice({ onStatus = () => {}, onActivity = () => {},
     if (token !== generation || disposed) throw interrupted();
     const context = ensureAudio();
     await context.resume();
+    if (token !== generation || disposed) throw interrupted();
     if (context.state !== 'running') throw new Error('Your browser paused audio. Click the voice preview button to enable playback.');
     const audio = context.createBuffer(1, samples.length, sampleRate);
     audio.copyToChannel(samples, 0);
@@ -153,6 +156,71 @@ export function createMotherVoice({ onStatus = () => {}, onActivity = () => {},
       utterance.onerror = () => { finishSystem = null; onActivity('idle'); reject(new Error('The selected system voice could not play. Choose Mother’s neural voice or try another device voice.')); };
       speechSynthesis.speak(utterance);
     });
+  }
+  async function generateChunk(chunk, settings, token) {
+    if (token !== generation || disposed) throw interrupted();
+    if (!source) update({ state: 'generating', error: null, message: 'Mother is forming her words…' });
+    let result;
+    if (native) {
+      const operation = new AbortController(); nativeRequest = operation;
+      try {
+        const response = await fetchImpl('/api/voice/synthesize', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text:chunk,voice:settings.voiceName,speed:settings.voiceSpeed}), signal:AbortSignal.any([operation.signal,AbortSignal.timeout(120000)])});
+        if (!response.ok) { const body=await response.json(); throw Error(body.error || 'The local voice engine could not speak.'); }
+        const bytes=await response.arrayBuffer();
+        if (!bytes.byteLength || bytes.byteLength>24000*90*4 || bytes.byteLength%4) throw Error('The voice engine returned invalid audio.');
+        result={samples:new Float32Array(bytes),sampleRate:24000};
+        if (result.samples.some(value=>!Number.isFinite(value))) throw Error('The voice engine returned invalid audio.');
+      } finally { if (nativeRequest===operation) nativeRequest=null; }
+    } else result=await request('generate',{text:chunk,voice:settings.voiceName,speed:settings.voiceSpeed});
+    if (token !== generation || disposed) throw interrupted();
+    return result;
+  }
+  async function performSpeech(chunks, {voice='af_heart',speed=1,engine='kokoro'} = {}) {
+    if (disposed) throw new Error('This voice session is closed.');
+    stop();
+    const token=generation;
+    const settings=normalizeVoiceSettings({voiceName:voice,voiceSpeed:speed,voiceEngine:engine});
+    const iterator=(async function*(){for await (const part of chunks) for(const chunk of speechChunks(part,130)) yield chunk;})();
+    let duration=0;
+    if (settings.voiceEngine!=='system' && !prepared) throw new Error('Open Voice settings and download Mother’s human voice first.');
+    let cancelWait;
+    const stopped=new Promise(resolve=>{cancelWait=()=>resolve({error:interrupted()});speechStops.add(cancelWait);});
+    // Keep at most one future passage in flight, forming the next words while
+    // the current audio plays. A stream can start before the full reply exists.
+    const nextJob=()=>iterator.next().then(async part=>{
+      if(token!==generation || disposed)throw interrupted();
+      if(part.done)return null;
+      return settings.voiceEngine==='system'?{text:part.value}:await generateChunk(part.value,settings,token);
+    }).then(value=>({value}),error=>({error}));
+    try {
+      let job=nextJob();
+      while (true) {
+        const outcome=await Promise.race([job,stopped]);
+        if(outcome.error)throw outcome.error;
+        if(!outcome.value)break;
+        const result=outcome.value;
+        if(token!==generation || disposed)throw interrupted();
+        if(settings.voiceEngine==='system') {
+          await speakSystem(result.text,settings.voiceSpeed);job=nextJob();
+        } else {
+          const samples=result.samples instanceof Float32Array?result.samples:new Float32Array(result.samples);
+          duration+=samples.length/result.sampleRate;
+          const playback=play(samples,result.sampleRate,token);
+          job=nextJob();
+          await playback;
+        }
+        if(token!==generation || disposed)throw interrupted();
+      }
+      return {duration,engine:settings.voiceEngine,voice:settings.voiceName};
+    } catch(error) {
+      if(error.name!=='AbortError')update({state:'error',error:error.message,message:null});
+      throw error;
+    } finally {
+      speechStops.delete(cancelWait);
+      // Do not await an unfinished producer during cancellation.
+      void iterator.return?.();
+      if(token===generation){onActivity('idle');if(status.state!=='error')update({state:'ready',message:'Mother’s neural voice is ready on this device.'});}
+    }
   }
   return {
     getStatus,
@@ -181,48 +249,11 @@ export function createMotherVoice({ onStatus = () => {}, onActivity = () => {},
       })();
       return preparation;
     },
-    async speak(text, { voice = 'af_heart', speed = 1, engine = 'kokoro' } = {}) {
-      if (disposed) throw new Error('This voice session is closed.');
-      stop();
-      const token = generation;
-      const settings = normalizeVoiceSettings({ voiceName: voice, voiceSpeed: speed, voiceEngine: engine });
-      const chunks = speechChunks(text);
-      if (!chunks.length) return { duration: 0, engine: settings.voiceEngine };
-      if (settings.voiceEngine === 'system') return speakSystem(chunks.join(' '), settings.voiceSpeed);
-      if (!prepared) throw new Error('Open Voice settings and download Mother’s human voice first.');
-      let duration = 0;
-      try {
-        for (const chunk of chunks) {
-          if (token !== generation || disposed) throw interrupted();
-          update({ state: 'generating', error: null, message: 'Mother is forming her words…' });
-          let result;
-          if(native){
-            const operation=new AbortController();nativeRequest=operation;
-            try{
-              const response=await fetchImpl('/api/voice/synthesize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:chunk,voice:settings.voiceName,speed:settings.voiceSpeed}),signal:AbortSignal.any([operation.signal,AbortSignal.timeout(120000)])});
-              if(!response.ok){const body=await response.json();throw Error(body.error||'The local voice engine could not speak.');}
-              const bytes=await response.arrayBuffer();
-              if(!bytes.byteLength||bytes.byteLength>24000*90*4||bytes.byteLength%4)throw Error('The voice engine returned invalid audio.');
-              result={samples:new Float32Array(bytes),sampleRate:24000};
-              if(result.samples.some(value=>!Number.isFinite(value)))throw Error('The voice engine returned invalid audio.');
-            }finally{if(nativeRequest===operation)nativeRequest=null;}
-          }else result=await request('generate', { text: chunk, voice: settings.voiceName, speed: settings.voiceSpeed });
-          if (token !== generation || disposed) throw interrupted();
-          const samples = result.samples instanceof Float32Array ? result.samples : new Float32Array(result.samples);
-          duration += samples.length / result.sampleRate;
-          await play(samples, result.sampleRate, token);
-        }
-        return { duration, engine: 'kokoro', voice: settings.voiceName };
-      } catch (error) {
-        if (error.name !== 'AbortError') update({ state: 'error', error: error.message, message: null });
-        throw error;
-      } finally {
-        if (token === generation) {
-          onActivity('idle');
-          if (status.state !== 'error') update({ state: 'ready', message: 'Mother’s neural voice is ready on this device.' });
-        }
-      }
+    speak(text, settings = {}) {
+      return performSpeech(speechChunks(text, 130), settings);
     },
+    speakStream(chunks, settings = {}) { return performSpeech(chunks, settings); },
+    unlock() { try { ensureAudio(); } catch {} },
     stop,
     dispose() { stop(); disposed = true; worker?.terminate(); worker = null; failRequests(interrupted()); void audioContext?.close().catch(() => {}); },
   };

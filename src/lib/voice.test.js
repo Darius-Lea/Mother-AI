@@ -35,3 +35,22 @@ test('stopping a pending neural passage rejects playback and disposes the owned 
   const speaking=controller.speak('A sentence');controller.stop();await assert.rejects(speaking,{name:'AbortError'});
   controller.dispose();assert.equal(terminated,true);
 });
+
+test('streamed speech starts before the next sentence exists and prepares only one passage ahead',async()=>{
+  const listeners={};const generated=[],playing=[];
+  const worker={addEventListener:(name,fn)=>listeners[name]=fn,terminate(){},postMessage(message){
+    if(message.type==='generate')generated.push(message.payload.text);
+    queueMicrotask(()=>listeners.message({data:{id:message.id,result:message.type==='prepare'?{ready:true}:{samples:Float32Array.of(.1,.2),sampleRate:24000}}}));
+  }};
+  const context={state:'running',resume:async()=>{},close:async()=>{},createBuffer:()=>({copyToChannel(){}}),destination:{},createBufferSource(){const source={connect(){},stop(){source.onended?.();},start(){playing.push(source);}};return source;}};
+  const voice=createMotherVoice({workerFactory:()=>worker,audioContextFactory:()=>context,speechSynthesis:{cancel(){}}});
+  await voice.prepare({consent:true});
+  let nextSentence;const queue={async *[Symbol.asyncIterator](){yield 'First sentence ready.';await new Promise(resolve=>nextSentence=resolve);yield 'Second sentence ready.';}};
+  const reply=voice.speakStream(queue);
+  await new Promise(resolve=>setTimeout(resolve,10));
+  assert.deepEqual(generated,['First sentence ready.']);assert.equal(playing.length,1);
+  nextSentence();await new Promise(resolve=>setTimeout(resolve,10));
+  assert.equal(generated.length,2);assert.equal(playing.length,1);
+  playing[0].onended();await new Promise(resolve=>setTimeout(resolve,10));
+  assert.equal(playing.length,2);playing[1].onended();await reply;voice.dispose();
+});
